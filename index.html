@@ -362,15 +362,15 @@ function fmtWhen(t) {
 
 function defaults() {
   return {
-    version: 6,
+    version: 7,
     categories: [
-      {id: 'location', name: 'Location', options: ['ลำธารหมู่บ้าน']},
-      {id: 'spot', name: 'Spot', options: ['ไม่มี', 'น้ำวน', 'กลางกระแส', 'ใต้ร่มหิน']},
+      {id: 'location', name: 'Location', options: ['ลำธารหมู่บ้าน', 'ลำธารบนภูเขา']},
       {id: 'weather', name: 'Weather', options: ['ปลอดโปร่ง', 'ฝนตก']},
-      {id: 'lure', name: 'Lure', options: ['ไส้เดือน', 'แป้ง', 'ปลาซิว', 'โดโจ', 'แมลงปอ', 'จิ้งหรีด', 'ตั๊กแตน']},
       {id: 'water', name: 'Water', options: ['น้ำตื้น', 'น้ำลึก']},
+      {id: 'lure', name: 'Lure', options: ['ไส้เดือน', 'แป้ง', 'ปลาซิว', 'โดโจ', 'แมลงปอ', 'จิ้งหรีด', 'ตั๊กแตน', 'หนอนผีเสื้อ']},
+      {id: 'spot', name: 'Spot', options: ['ไม่มี', 'น้ำวน', 'กลางกระแส', 'ใต้ร่มหิน']},
     ],
-    current: {location: 'ลำธารหมู่บ้าน', spot: 'ไม่มี', weather: 'ปลอดโปร่ง', lure: 'ไส้เดือน', water: 'น้ำลึก'},
+    current: {location: 'ลำธารหมู่บ้าน', weather: 'ปลอดโปร่ง', water: 'น้ำลึก', lure: 'ไส้เดือน', spot: 'ไม่มี'},
     currentSince: Date.now(),
     catches: [],
     lastBackup: 0,
@@ -396,7 +396,13 @@ function migrate(d) {
     // Casting spots came with a newer location; earlier catches had no spot to pick.
     addConditionForAll(d, 'spot', 'Spot', 'ไม่มี', {after: 'location', options: ['น้ำวน', 'กลางกระแส', 'ใต้ร่มหิน']});
   }
-  d.version = 6;
+  if (v < 7) orderConditions(d, ['location', 'weather', 'water', 'lure', 'spot']);
+  d.version = 7;
+}
+// Puts the listed condition types first, in that order; any others keep their order after them.
+function orderConditions(d, ids) {
+  const rank = id => (ids.includes(id) ? ids.indexOf(id) : ids.length);
+  d.categories.sort((a, b) => rank(a.id) - rank(b.id));
 }
 // New condition type whose value is known for every catch so far. Without `after` it goes
 // first (where you fish comes before what you use).
