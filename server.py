@@ -83,7 +83,7 @@ def save_state(conn, state):
         else:
             d = datetime.fromtimestamp(c['t'] / 1000)
             caught_at, weekday, hour = d.strftime('%Y-%m-%d %H:%M'), WEEKDAYS[d.weekday()], d.hour
-        readable = {names[k]: v for k, v in cond.items() if k in names}
+        readable = {name: cond[k] for k, name in names.items() if k in cond}  # in condition order
         rows.append((str(c['id']), int(c['t']), caught_at, weekday, hour, str(c['fish']),
                      json.dumps(readable, ensure_ascii=False), json.dumps(cond, ensure_ascii=False),
                      int(note), hm))

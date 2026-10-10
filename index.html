@@ -362,13 +362,14 @@ function fmtWhen(t) {
 
 function defaults() {
   return {
-    version: 4,
+    version: 5,
     categories: [
+      {id: 'location', name: 'Location', options: ['ลำธารหมู่บ้าน']},
       {id: 'weather', name: 'Weather', options: ['ปลอดโปร่ง', 'ฝนตก']},
       {id: 'lure', name: 'Lure', options: ['ไส้เดือน', 'แป้ง', 'ปลาซิว', 'โดโจ', 'แมลงปอ', 'จิ้งหรีด', 'ตั๊กแตน']},
       {id: 'water', name: 'Water', options: ['น้ำตื้น', 'น้ำลึก']},
     ],
-    current: {weather: 'ปลอดโปร่ง', lure: 'ไส้เดือน', water: 'น้ำลึก'},
+    current: {location: 'ลำธารหมู่บ้าน', weather: 'ปลอดโปร่ง', lure: 'ไส้เดือน', water: 'น้ำลึก'},
     currentSince: Date.now(),
     catches: [],
     lastBackup: 0,
@@ -376,7 +377,7 @@ function defaults() {
 }
 
 // Upgrades logs saved by older versions of this page (browser copies, the database, old exports):
-// names that were first written differently from how the game shows them.
+// names first written differently from how the game shows them, and conditions added later.
 function migrate(d) {
   const v = d.version || 1;
   if (v < 2) renameOption(d, 'weather', 'แดดออก', 'ปลอดโปร่ง');
@@ -385,7 +386,25 @@ function migrate(d) {
     renameFish(d, 'กุ้งเครฟิช', 'กุ้งเครย์ฟิช');
   }
   if (v < 4) renameFish(d, 'ปลาเฮอริง', 'ปลาเฮอร์ริง');
-  d.version = 4;
+  if (v < 5) {
+    renameFish(d, 'เซลมอน', 'ปลาแซลมอน');
+    // Location became a condition later; every catch before that was at the village stream.
+    addConditionForAll(d, 'location', 'Location', 'ลำธารหมู่บ้าน');
+  }
+  d.version = 5;
+}
+function addConditionForAll(d, catId, name, value) {
+  let cat = d.categories.find(c => c.id === catId);
+  if (!cat) {
+    cat = {id: catId, name, options: []};
+    d.categories.unshift(cat); // shown first: where you fish comes before what you use
+  }
+  if (!cat.options.includes(value)) cat.options.unshift(value);
+  for (const c of d.catches) {
+    c.cond ||= {};
+    if (c.cond[catId] == null) c.cond[catId] = value;
+  }
+  if (d.current[catId] == null) d.current[catId] = value;
 }
 function renameFish(d, from, to) {
   for (const c of d.catches) if (c.fish === from) c.fish = to;
