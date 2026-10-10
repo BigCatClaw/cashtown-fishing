@@ -1,0 +1,1514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cash Town Fishing Log</title>
+<meta name="description" content="Fish guide for Cash Town: which fish bite with which weather, lure, water depth and time of day, logged from real play.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Cash Town Fishing Log">
+<meta property="og:description" content="Which fish bite with which weather, lure, water depth and time of day in Cash Town. Logged from real play.">
+<link rel="icon" id="favicon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+<script>
+  // Apply a chosen Light/Dark theme before the page paints (Auto follows the browser).
+  try {
+    const t = JSON.parse(localStorage.getItem('cashtown-fishing-ui') || '{}').theme;
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch {}
+</script>
+<style>
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  :root{
+    --page:#6d4526; --page2:#61391d;
+    --panel:#f7e6bd; --panel-2:#f0d9a5; --ink:#3b2413; --muted:#775432;
+    --line:#3b2413; --hi:#fffbea; --shade:#d8b878;
+    --chip:#fdf2d4; --chip-ink:#3b2413;
+    --sel:#4e8a2e; --sel-ink:#fffbe8;
+    --accent:#eaa53a; --accent-ink:#3b2413;
+    --hit:#2b78b3; --zero:#e3c98f; --danger:#b23f2b;
+    --field:#fffaf0;
+    --px2:0 -2px 0 var(--line),0 2px 0 var(--line),-2px 0 0 var(--line),2px 0 0 var(--line);
+    --px3:0 -3px 0 var(--line),0 3px 0 var(--line),-3px 0 0 var(--line),3px 0 0 var(--line);
+    --px4:0 -4px 0 var(--line),0 4px 0 var(--line),-4px 0 0 var(--line),4px 0 0 var(--line);
+    color-scheme:light;
+  }
+  /* Night colours: when the browser is dark (Auto), or when Dark is picked. Keep both blocks the same. */
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --page:#141a2a; --page2:#10162a;
+      --panel:#263049; --panel-2:#1f2840; --ink:#f1e6cb; --muted:#aaa48f;
+      --line:#080b14; --hi:#34405f; --shade:#19203a;
+      --chip:#303c5c; --chip-ink:#f1e6cb;
+      --sel:#79b84c; --sel-ink:#10200a;
+      --accent:#f2b552; --accent-ink:#2a1906;
+      --hit:#5db5f0; --zero:#38456a; --danger:#e0654c;
+      --field:#1b2338;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --page:#141a2a; --page2:#10162a;
+    --panel:#263049; --panel-2:#1f2840; --ink:#f1e6cb; --muted:#aaa48f;
+    --line:#080b14; --hi:#34405f; --shade:#19203a;
+    --chip:#303c5c; --chip-ink:#f1e6cb;
+    --sel:#79b84c; --sel-ink:#10200a;
+    --accent:#f2b552; --accent-ink:#2a1906;
+    --hit:#5db5f0; --zero:#38456a; --danger:#e0654c;
+    --field:#1b2338;
+    color-scheme:dark;
+  }
+  html,body{margin:0}
+  body{
+    font-family:'Pixelify Sans','Mitr',ui-monospace,Consolas,monospace;
+    font-size:17px;line-height:1.45;color:var(--ink);min-height:100vh;
+    background:var(--page) repeating-linear-gradient(180deg,transparent 0 44px,var(--page2) 44px 48px);
+  }
+  button{font-family:inherit}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+  .layout{max-width:1240px;margin:0 auto;padding:18px 16px 90px;display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+  .layout>*{min-width:0}
+  .side{display:grid;gap:24px;align-content:start}
+  @media (min-width:980px){
+    .layout{grid-template-columns:400px minmax(0,1fr);align-items:start}
+    .side{position:sticky;top:14px}
+  }
+  /* Phones: on the public page, results come right after the picker; "About" goes last. */
+  @media (max-width:979px){
+    .side{display:contents}
+    main{order:2}
+    #aboutPanel{order:3}
+  }
+
+  .top{grid-column:1/-1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:#fdf0cf;text-shadow:2px 2px 0 rgba(0,0,0,.45)}
+  .top h1{margin:0;font-size:30px;line-height:1}
+  .top small{display:block;font-size:14px;letter-spacing:2px;text-transform:uppercase;opacity:.85}
+  .top .stats{margin-left:auto;font-size:16px;text-align:right}
+  .db{font-size:13px;margin-top:2px}
+  .db.ok::before{content:'';display:inline-block;width:8px;height:8px;background:#8fdc6a;margin-right:6px;vertical-align:1px}
+  .db.warn{color:#ffd27a}
+  .theme{display:inline-flex;gap:8px;margin-top:8px;padding:2px;text-shadow:none}
+  .theme .chip{font-size:13px;padding:1px 8px}
+  .banner{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);padding:12px 16px;box-shadow:var(--px3)}
+  .notice{grid-column:1/-1;background:var(--panel);color:var(--ink);padding:12px 16px 12px;margin:0 4px;
+    box-shadow:var(--px3),inset 6px 0 0 var(--accent);padding-left:22px}
+  .notice p{margin:4px 0 0}
+  .notice .en{font-size:14px;color:var(--muted)}
+  .notice-tag{display:inline-block;font-size:13px;font-weight:700;letter-spacing:.5px;background:var(--accent);color:var(--accent-ink);padding:1px 8px}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin:0 0 14px}
+  .facts div{min-width:0}
+  .facts dt{font-size:13px;color:var(--muted)}
+  .facts dd{margin:0;font-size:22px;font-weight:700;line-height:1.2}
+  .facts dd.small{font-size:15px;font-weight:600}
+  .logo svg{display:block;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.4))}
+  .warn{grid-column:1/-1;background:var(--danger);color:#fff;padding:10px 14px;box-shadow:var(--px3)}
+
+  .panel{background:var(--panel);padding:14px 16px 18px;position:relative;
+    box-shadow:var(--px4),inset 0 4px 0 var(--hi),inset 0 -4px 0 var(--shade)}
+  .panel-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+  .panel-head h2{margin:0;font-size:21px;letter-spacing:.5px}
+  .panel-head .meta{margin-left:auto;font-size:14px;color:var(--muted)}
+  .lead{margin:-4px 0 14px;color:var(--muted);font-size:15px}
+  h3.sub{font-size:17px;margin:24px 0 8px}
+  .hint{font-size:14px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .center{text-align:center}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .mini-label{font-size:13px;color:var(--muted);margin:16px 0 8px;text-transform:uppercase;letter-spacing:1px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:2px}
+  .chips.tight{gap:6px}
+  .chip{font-size:16px;color:var(--chip-ink);background:var(--chip);border:0;padding:4px 10px;cursor:pointer;
+    box-shadow:var(--px2),inset 0 -2px 0 var(--shade)}
+  .chip:hover{filter:brightness(1.06)}
+  .chip[aria-pressed="true"]{background:var(--sel);color:var(--sel-ink);box-shadow:var(--px2),inset 0 2px 0 rgba(0,0,0,.25)}
+  .chip.toggle[aria-pressed="false"]{opacity:.6;text-decoration:line-through}
+  .chip.add{background:transparent;color:var(--muted)}
+  .chip.ghost{opacity:.75}
+  .chip small{margin-left:6px;font-size:13px;opacity:.7}
+  .chip.editing{display:inline-flex;align-items:center;padding:0;cursor:default}
+  .chip.editing .lbl{font:inherit;background:none;border:0;color:inherit;padding:4px 2px 4px 10px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+  .x{font-size:18px;line-height:1;background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 6px}
+  .x:hover{color:var(--danger)}
+
+  .btn{font-size:16px;font-weight:600;border:0;cursor:pointer;padding:7px 14px;background:var(--accent);color:var(--accent-ink);
+    box-shadow:var(--px3),inset 0 -3px 0 rgba(0,0,0,.18);white-space:nowrap}
+  .btn:active{transform:translateY(2px)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .btn.ghost{background:var(--chip);color:var(--chip-ink)}
+  .btn.danger{background:var(--danger);color:#fff}
+  .btn.small{font-size:14px;padding:3px 9px;box-shadow:var(--px2),inset 0 -2px 0 rgba(0,0,0,.15)}
+
+  .field{font:inherit;font-size:18px;color:var(--ink);background:var(--field);border:0;padding:8px 10px;min-width:0;
+    box-shadow:var(--px3),inset 0 3px 0 rgba(0,0,0,.08)}
+  .field:focus{outline:2px solid var(--accent);outline-offset:5px}
+  select.field{font-size:16px;cursor:pointer}
+
+  .cond-row{display:grid;grid-template-columns:84px 1fr;gap:10px;align-items:start;padding:9px 0;border-top:2px dotted var(--shade)}
+  .cond-row:first-child{border-top:0;padding-top:2px}
+  .cond-label{font-size:14px;color:var(--muted);padding-top:5px;font-weight:600}
+  .auto-val{padding-top:3px}
+  .auto-val b{font-size:18px}
+
+  .catch-form{display:flex;gap:14px;padding:3px}
+  .catch-form .field{flex:1 1 0;width:0}
+  .recent{list-style:none;margin:0;padding:0;font-size:15px}
+  .recent li{display:flex;gap:8px;align-items:baseline;padding:3px 0}
+  .recent .t{color:var(--muted);font-variant-numeric:tabular-nums}
+  .recent .cnd{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+
+  .tabs{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin:0 4px -4px;position:relative;z-index:1}
+  .tab{font-size:16px;border:0;cursor:pointer;padding:7px 14px;margin-bottom:4px;background:var(--panel-2);color:var(--ink);
+    box-shadow:0 -3px 0 var(--line),-3px 0 0 var(--line),3px 0 0 var(--line)}
+  .tab[aria-selected="true"]{background:var(--panel);padding-bottom:15px;margin-bottom:0;font-weight:700}
+  .tab .dot{display:inline-block;background:var(--danger);color:#fff;font-size:12px;padding:0 5px;margin-left:4px}
+  .view{min-height:320px}
+
+  .match{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px;padding:2px}
+  .match .label{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-right:4px}
+  .summary{margin:0 0 10px}
+  .empty{padding:30px 8px;text-align:center;color:var(--muted)}
+
+  .table-wrap{overflow-x:auto;position:relative}
+  table{width:100%;border-collapse:collapse;font-size:16px}
+  th{font-size:14px;color:var(--muted);font-weight:600;text-align:left;padding:6px 8px;border-bottom:3px solid var(--line);white-space:nowrap}
+  td{padding:7px 8px;border-bottom:2px dotted var(--shade);vertical-align:middle}
+  td.when{white-space:nowrap;color:var(--muted);font-size:15px}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .bar{display:inline-block;width:80px;height:12px;background:var(--zero);vertical-align:middle;margin-right:8px}
+  .bar span{display:block;height:100%;background:var(--sel)}
+  .link{font:inherit;background:none;border:0;padding:0;color:inherit;cursor:pointer;font-weight:600;text-decoration:underline dotted;text-underline-offset:3px;text-align:left}
+
+  .strip{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;min-width:168px}
+  .strip.day{grid-template-columns:repeat(7,1fr);max-width:230px;min-width:0}
+  .cell{height:14px;background:var(--zero)}
+  .cell.none{background:transparent;box-shadow:inset 0 0 0 1px var(--zero)}
+  .cell.hit{background:color-mix(in srgb,var(--hit) var(--p,100%),var(--zero))}
+  .cell.now{outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:1}
+  .strip-labels{display:grid;grid-template-columns:repeat(4,1fr);font-size:12px;color:var(--muted);margin-top:3px}
+  .strip-labels.day{grid-template-columns:repeat(7,1fr);max-width:230px;text-align:center}
+
+  .controls{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding:3px}
+  .controls .field{flex:1 1 200px;width:0}
+  .controls select.field{flex:0 0 auto;width:auto}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin:0 0 16px;align-items:center}
+  .legend .cell{display:inline-block;width:14px;vertical-align:middle;margin-right:4px}
+
+  .cards{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));padding:3px}
+  .fish-card{background:var(--panel-2);padding:12px 14px 14px;box-shadow:var(--px3)}
+  .fish-card header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .fish-card h3{margin:0;font-size:20px}
+  .fish-card header .btn{margin-left:auto}
+  .count{font-weight:700;color:var(--sel)}
+  .last{font-size:13px;color:var(--muted);margin-top:2px}
+  .facet{display:grid;grid-template-columns:68px 1fr;gap:8px;align-items:start;margin-top:10px}
+  .facet-label{font-size:13px;color:var(--muted);padding-top:2px}
+  .tag{display:inline-block;font-size:14px;padding:1px 7px;background:var(--chip);color:var(--chip-ink);box-shadow:var(--px2)}
+  button.tag{font:inherit;font-size:14px;border:0;cursor:pointer}
+  .tag b{margin-left:5px}
+  .tag.seen b{color:var(--sel)}
+  .tag.zero{opacity:.55}
+  .tag.unknown{opacity:.4;background:transparent}
+  .tag.cond{background:var(--panel-2);font-weight:600}
+  .clues{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding:2px}
+  .clue{font-size:14px;background:var(--accent);color:var(--accent-ink);padding:1px 8px;box-shadow:var(--px2)}
+  .clue.soft{background:var(--chip);color:var(--chip-ink)}
+
+  .combo{padding:12px 4px;border-top:2px dotted var(--shade);display:grid;gap:9px}
+  .combo:first-child{border-top:0}
+  .combo.current{background:color-mix(in srgb,var(--sel) 13%,transparent);padding:12px 10px}
+  .combo-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .combo-head .muted{margin-left:auto;font-size:15px}
+  .now-badge{font-size:13px;background:var(--sel);color:var(--sel-ink);padding:2px 8px}
+
+  .row{display:flex;flex-wrap:wrap;gap:14px;padding:3px}
+  .cats{list-style:none;padding:0;margin:0 0 14px}
+  .cats li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:2px dotted var(--shade);flex-wrap:wrap}
+  .spacer{flex:1}
+
+  #toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,180%);transition:transform .2s steps(4);
+    background:var(--panel);color:var(--ink);display:flex;gap:14px;align-items:center;padding:10px 14px;
+    box-shadow:var(--px4);z-index:50;max-width:calc(100vw - 32px)}
+  #toast.show{transform:translate(-50%,0)}
+  dialog{border:0;padding:18px;background:var(--panel);color:var(--ink);box-shadow:var(--px4);width:min(420px,calc(100vw - 40px))}
+  dialog::backdrop{background:rgba(10,8,4,.55)}
+  dialog h3{margin:0 0 8px;font-size:19px}
+  dialog p{margin:0 0 12px;color:var(--muted);font-size:15px}
+  dialog .field{width:100%}
+  dialog menu{display:flex;justify-content:flex-end;gap:14px;padding:0;margin:18px 0 0}
+</style>
+</head>
+<body>
+<div class="layout">
+  <header class="top">
+    <span class="logo" id="logo" aria-hidden="true"></span>
+    <div><small>Cash Town</small><h1>Fishing Log</h1></div>
+    <div class="stats">
+      <div id="stats"></div>
+      <div class="db" id="dbStatus"></div>
+      <div class="db" id="pubStatus"></div>
+      <div class="theme" id="themeSwitch" role="group" aria-label="Theme"></div>
+    </div>
+  </header>
+  <div class="notice" id="notice" hidden>
+    <span class="notice-tag">หมายเหตุ · Note</span>
+    <p>ข้อมูลทั้งหมดบันทึกจากการเล่นของผู้จัดทำเอง อาจไม่ครบถ้วนหรือไม่ถูกต้องทั้งหมด ใช้เป็นแนวทางประกอบการเล่นเท่านั้น</p>
+    <p class="en">Everything here was logged from my own play sessions, so it may be incomplete or wrong. Treat it as a guide.</p>
+  </div>
+  <div class="banner" id="banner" hidden><b>Not saving to the database.</b> Catches you log here stay in this browser only. Double-click <b>start.bat</b> in the fishing folder and this page switches over by itself, bringing these catches along.</div>
+  <div class="warn" id="warn" hidden>This browser isn't letting the page save, so your catches will be lost when you close it. Use Data → Export backup before closing.</div>
+
+  <aside class="side">
+    <section class="panel" aria-labelledby="condTitle">
+      <div class="panel-head">
+        <h2 id="condTitle">Conditions</h2>
+        <span class="meta" id="condMeta"></span>
+        <button class="btn small ghost" id="editBtn" data-act="edit" type="button">✎ Edit</button>
+      </div>
+      <div id="conditions"></div>
+    </section>
+
+    <section class="panel" id="aboutPanel" aria-labelledby="aboutTitle" hidden>
+      <div class="panel-head"><h2 id="aboutTitle">About this data</h2></div>
+      <div id="about"></div>
+    </section>
+
+    <section class="panel" id="catchPanel" aria-labelledby="catchTitle">
+      <div class="panel-head"><h2 id="catchTitle">Caught something?</h2></div>
+      <form id="catchForm" class="catch-form" autocomplete="off">
+        <input class="field" id="fishInput" list="fishList" placeholder="Fish name, then Enter" aria-label="Fish name" autofocus>
+        <button class="btn" type="submit">Log it</button>
+      </form>
+      <datalist id="fishList"></datalist>
+      <div class="mini-label">Tap to log</div>
+      <div class="chips" id="quick"></div>
+      <div class="mini-label">Recent</div>
+      <ul class="recent" id="recent"></ul>
+    </section>
+  </aside>
+
+  <main>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Views"></nav>
+    <section class="panel view" id="view" role="tabpanel"></section>
+  </main>
+</div>
+
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<script src="seed-notes.js"></script>
+<dialog id="dlg">
+  <h3 id="dlgTitle"></h3>
+  <p id="dlgText"></p>
+  <input class="field" id="dlgInput" autocomplete="off">
+  <menu><button class="btn ghost" id="dlgCancel" type="button">Cancel</button><button class="btn" id="dlgOk" type="button">OK</button></menu>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+const KEY = 'cashtown-fishing-log';
+const UI_KEY = 'cashtown-fishing-ui';
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEK = [1, 2, 3, 4, 5, 6, 0]; // Monday first
+
+// Where the page runs: on this PC (start.bat, or index.html opened directly) it's the logging tool.
+// Anywhere else (the public GitHub Pages site, or ?view to preview it) it's a read-only guide
+// built from data.json.
+const ON_PC = location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname);
+const VIEW = !ON_PC || new URLSearchParams(location.search).has('view');
+
+const TABS = VIEW
+  ? [['now', 'What bites'], ['fish', 'Fish guide'], ['combos', 'Combos']]
+  : [['now', 'Right now'], ['fish', 'Fish guide'], ['combos', 'Combos'], ['log', 'Log'], ['data', 'Data']];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const clean = s => String(s ?? '').trim().replace(/\s+/g, ' ');
+const empty = msg => `<div class="empty">${esc(msg)}</div>`;
+
+// Catches copied from paper notes (note: true) have no date, and sometimes no time (hm).
+const hourOf = c => c.note ? (c.hm ? Number(c.hm.slice(0, 2)) : null) : new Date(c.t).getHours();
+const dayOf = c => c.note ? null : new Date(c.t).getDay();
+const timeText = c => c.note ? (c.hm || '--:--') : fmtTime(c.t);
+const whenText = c => c.note ? `from notes${c.hm ? ', ' + c.hm : ''}` : fmtWhen(c.t);
+const fmtTime = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
+const stamp = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const hourName = h => `${pad(h)}:00–${pad((h + 1) % 24)}:00`;
+function fmtWhen(t) {
+  const d = new Date(t);
+  const year = d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '';
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${d.toLocaleString('en', {month: 'short'})}${year}, ${fmtTime(t)}`;
+}
+
+// ---------- state ----------
+
+function defaults() {
+  return {
+    version: 4,
+    categories: [
+      {id: 'weather', name: 'Weather', options: ['ปลอดโปร่ง', 'ฝนตก']},
+      {id: 'lure', name: 'Lure', options: ['ไส้เดือน', 'แป้ง', 'ปลาซิว', 'โดโจ', 'แมลงปอ', 'จิ้งหรีด', 'ตั๊กแตน']},
+      {id: 'water', name: 'Water', options: ['น้ำตื้น', 'น้ำลึก']},
+    ],
+    current: {weather: 'ปลอดโปร่ง', lure: 'ไส้เดือน', water: 'น้ำลึก'},
+    currentSince: Date.now(),
+    catches: [],
+    lastBackup: 0,
+  };
+}
+
+// Upgrades logs saved by older versions of this page (browser copies, the database, old exports):
+// names that were first written differently from how the game shows them.
+function migrate(d) {
+  const v = d.version || 1;
+  if (v < 2) renameOption(d, 'weather', 'แดดออก', 'ปลอดโปร่ง');
+  if (v < 3) {
+    renameOption(d, 'lure', 'หนอน', 'ไส้เดือน');
+    renameFish(d, 'กุ้งเครฟิช', 'กุ้งเครย์ฟิช');
+  }
+  if (v < 4) renameFish(d, 'ปลาเฮอริง', 'ปลาเฮอร์ริง');
+  d.version = 4;
+}
+function renameFish(d, from, to) {
+  for (const c of d.catches) if (c.fish === from) c.fish = to;
+}
+function renameOption(d, catId, from, to) {
+  const cat = d.categories.find(c => c.id === catId);
+  if (cat && cat.options.includes(from)) {
+    cat.options = cat.options.includes(to) ? cat.options.filter(o => o !== from) : cat.options.map(o => o === from ? to : o);
+  }
+  for (const c of d.catches) if (c.cond?.[catId] === from) c.cond[catId] = to;
+  if (d.current[catId] === from) d.current[catId] = to;
+}
+
+let storageOk = true;
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch { storageOk = false; return defaults(); }
+  if (!raw) return defaults();
+  try {
+    const d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.categories) || !Array.isArray(d.catches)) throw new Error('bad shape');
+    return normalize(d);
+  } catch {
+    // Keep the unreadable copy around instead of silently overwriting it.
+    try { localStorage.setItem(`${KEY}-unreadable-${Date.now()}`, raw); } catch {}
+    return defaults();
+  }
+}
+function normalize(d) {
+  d.current ||= {};
+  d.currentSince ||= Date.now();
+  d.lastBackup ||= 0;
+  d.catches.sort((a, b) => a.t - b.t);
+  migrate(d);
+  return d;
+}
+
+let published = {updatedAt: 0}; // visitors: when data.json was last uploaded
+
+// ---------- database (when opened through start.bat / server.py) ----------
+// Every save goes to browser storage first, then to fishing-log.db through the server.
+// "pending" marks browser changes the database hasn't confirmed yet, so they get merged in later.
+
+const SERVER_URL = 'http://localhost:8765/';
+const API = !VIEW && location.protocol.startsWith('http') ? 'api/state' : null;
+const PENDING_KEY = 'cashtown-fishing-pending';
+let db = VIEW ? 'view' : API ? 'connecting' : 'off'; // view | off | connecting | ok | offline
+let dirtyGen = 0, savedGen = 0, dbSavedAt = 0, pushTimer = 0, retryTimer = 0, pushing = false, pushAgain = false;
+let pub = null; // website upload status reported by server.py
+const setPending = on => { try { on ? localStorage.setItem(PENDING_KEY, '1') : localStorage.removeItem(PENDING_KEY); } catch {} };
+const isPending = () => { try { return localStorage.getItem(PENDING_KEY) === '1'; } catch { return false; } };
+
+function save() {
+  if (VIEW) return; // visitors never change the data
+  try { localStorage.setItem(KEY, JSON.stringify(S)); storageOk = true; } catch { storageOk = false; }
+  if (API) {
+    dirtyGen++;
+    setPending(true);
+    if (db === 'ok') { clearTimeout(pushTimer); pushTimer = setTimeout(push, 200); }
+  }
+  renderDb();
+}
+
+async function connectDb() {
+  clearTimeout(retryTimer);
+  try {
+    const res = await fetch(API, {cache: 'no-store'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const saved = await res.json();
+    if (saved && Array.isArray(saved.catches) && Array.isArray(saved.categories)) {
+      const local = S;
+      S = normalize(saved);
+      if (isPending()) { // changed here while the database was unreachable
+        mergeIn(local);
+        S.current = local.current;
+        S.currentSince = local.currentSince;
+      }
+    }
+  } catch {
+    db = 'offline';
+    renderDb();
+    retryTimer = setTimeout(connectDb, 10000);
+    return;
+  }
+  db = 'ok';
+  applySeed(window.CASHTOWN_SEED);
+  save();
+  renderAll();
+  takeCarried();
+  refreshPub();
+}
+
+async function push() {
+  if (pushing) { pushAgain = true; return; }
+  pushing = true;
+  const gen = dirtyGen;
+  try {
+    const res = await fetch(API, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(S)});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    savedGen = gen;
+    dbSavedAt = Date.now();
+    if (gen === dirtyGen) setPending(false);
+    const body = await res.json().catch(() => ({}));
+    if (body.publish) { pub = body.publish; checkPubWhenDue(); }
+  } catch {
+    db = 'offline';
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(connectDb, 10000);
+  }
+  pushing = false;
+  renderDb();
+  if (pushAgain) { pushAgain = false; if (db === 'ok') push(); }
+}
+
+function renderDb() {
+  const el = $('#dbStatus'), pubEl = $('#pubStatus');
+  if (VIEW) {
+    el.className = 'db';
+    el.textContent = published.updatedAt ? `Updated ${fmtWhen(published.updatedAt)}` : '';
+    pubEl.hidden = true;
+    return;
+  }
+  let cls = 'warn', text;
+  if (db === 'off') text = 'Browser only, not in the database';
+  else if (db === 'connecting') { cls = ''; text = 'Connecting to database…'; }
+  else if (db === 'offline') text = 'Database not reachable, retrying (kept in browser meanwhile)';
+  else if (savedGen < dirtyGen) { cls = ''; text = 'Saving…'; }
+  else { cls = 'ok'; text = `Saved to fishing-log.db${dbSavedAt ? ' · ' + fmtTime(dbSavedAt) : ''}`; }
+  el.className = `db ${cls}`;
+  el.textContent = text;
+  const p = db === 'ok' ? pubText() : '';
+  pubEl.hidden = !p;
+  pubEl.textContent = p;
+  pubEl.className = `db${pub?.error ? ' warn' : ''}`;
+  $('#warn').hidden = storageOk || db === 'ok';
+}
+
+// ---------- public website (server.py uploads data.json to GitHub Pages) ----------
+
+function pubText() {
+  if (!pub?.enabled) return '';
+  if (pub.running) return pub.error ? 'Website: trying the upload again…' : 'Website: uploading…';
+  if (pub.error) return `Website: upload failed${pub.due ? `, retrying at ${fmtTime(pub.due)}` : ''}`;
+  if (pub.due) return `Website: updates at ${fmtTime(pub.due)}`;
+  return 'Website: up to date';
+}
+async function refreshPub() {
+  if (!API || db !== 'ok') return;
+  try {
+    const res = await fetch('api/publish', {cache: 'no-store'});
+    if (!res.ok) return;
+    pub = await res.json();
+    renderDb();
+    if (ui.tab === 'data') renderView();
+    checkPubWhenDue();
+  } catch {}
+}
+// Look again shortly after a scheduled upload should have finished.
+let pubCheckTimer = 0;
+function checkPubWhenDue() {
+  clearTimeout(pubCheckTimer);
+  if (pub?.running) pubCheckTimer = setTimeout(refreshPub, 5000);
+  else if (pub?.due) pubCheckTimer = setTimeout(refreshPub, Math.max(0, pub.due - Date.now()) + 8000);
+}
+async function publishNow() {
+  try {
+    const res = await fetch('api/publish', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+    if (res.ok) pub = await res.json();
+  } catch {}
+  renderDb();
+  if (ui.tab === 'data') renderView();
+  toast('Uploading to the website…');
+  setTimeout(refreshPub, 4000);
+  setTimeout(refreshPub, 15000);
+}
+
+// Visitors: load the published snapshot.
+async function loadPublished() {
+  $('#conditions').innerHTML = '<p class="hint">Loading…</p>';
+  $('#view').innerHTML = empty('Loading the fish data…');
+  try {
+    const res = await fetch(`data.json?t=${Date.now()}`, {cache: 'no-store'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.categories) || !Array.isArray(data.catches)) throw new Error('bad data');
+    published = {updatedAt: data.updatedAt || 0};
+    S = normalize({version: data.version, categories: data.categories, catches: data.catches, current: {}, lastBackup: 0});
+    // The visitor's own picks (remembered in their browser); anything not in the data means "Any".
+    for (const cat of S.categories) {
+      const v = ui.pick?.[cat.id];
+      S.current[cat.id] = v != null && valuesOf(cat).includes(v) ? v : null;
+    }
+  } catch {
+    $('#conditions').innerHTML = '';
+    $('#view').innerHTML = empty("Couldn't load the fish data. Please refresh the page in a moment.");
+    return;
+  }
+  renderAll();
+  renderDb();
+}
+
+// Opened by double-clicking index.html: move over to the database version as soon as
+// start.bat is running. Catches logged here ride along in the URL fragment (stays on this PC).
+const toB64 = s => {
+  const bytes = new TextEncoder().encode(s);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
+const fromB64 = s => new TextDecoder().decode(Uint8Array.from(atob(s), ch => ch.charCodeAt(0)));
+
+async function watchForServer() {
+  try {
+    await fetch(SERVER_URL + 'api/state', {mode: 'no-cors', cache: 'no-store'});
+  } catch {
+    $('#banner').hidden = false;
+    setTimeout(watchForServer, 5000);
+    return;
+  }
+  const mine = S.catches.filter(c => !c.note);
+  location.replace(mine.length ? `${SERVER_URL}#carry=${toB64(JSON.stringify({categories: S.categories, catches: mine}))}` : SERVER_URL);
+}
+
+// The database side of that hand-over. Asks first, since any link could carry a #carry.
+async function takeCarried() {
+  const m = location.hash.match(/^#carry=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  let data;
+  try { data = JSON.parse(fromB64(m[1])); } catch { return; }
+  if (!data || !Array.isArray(data.catches)) return;
+  const have = new Set(S.catches.map(c => c.id));
+  const fresh = data.catches.filter(c => c && c.id && !have.has(String(c.id)));
+  if (!fresh.length) return;
+  const yes = await ask({title: `Add ${plural(fresh.length, 'catch', 'catches')} to the database?`,
+    text: 'They were logged while the page was open without start.bat.', input: false, ok: 'Add them'});
+  if (!yes) return;
+  const added = mergeIn({categories: data.categories, catches: fresh});
+  save(); renderAll();
+  toast(`Added ${plural(added, 'catch', 'catches')} to the database`);
+}
+
+let S = load();
+
+function readUi() { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {}; } catch { return {}; } }
+function saveUi() {
+  const {tab, match, matchDay, matchHour, fishSort, theme, pick} = ui;
+  try { localStorage.setItem(UI_KEY, JSON.stringify({tab, match, matchDay, matchHour, fishSort, theme, pick})); } catch {}
+}
+// pick = a visitor's chosen conditions on the public page (never touches the log)
+const ui = Object.assign({tab: 'now', match: {}, matchDay: false, matchHour: false, fishSort: 'count', theme: 'auto', pick: {}}, readUi(),
+  {edit: false, fishQ: '', logQ: '', logAll: false});
+if (!ui.match || typeof ui.match !== 'object') ui.match = {};
+if (!ui.pick || typeof ui.pick !== 'object') ui.pick = {};
+if (!TABS.some(([id]) => id === ui.tab)) ui.tab = 'now';
+
+const catById = id => S.categories.find(c => c.id === id);
+const condText = cond => S.categories.map(cat => cond?.[cat.id] ?? '—').join(' · ');
+// True unless the catch clearly disagrees with the current conditions (missing info is fine).
+const fits = c => S.categories.every(cat => {
+  const v = c.cond?.[cat.id];
+  return v == null || S.current[cat.id] == null || v === S.current[cat.id];
+});
+
+// Options in the list, plus any older values still on past catches.
+function valuesOf(cat) {
+  const seen = new Set(cat.options), extra = [];
+  for (const c of S.catches) {
+    const v = c.cond?.[cat.id];
+    if (v != null && !seen.has(v)) { seen.add(v); extra.push(v); }
+  }
+  return [...cat.options, ...extra];
+}
+function fishCounts() {
+  const m = new Map();
+  for (const c of S.catches) m.set(c.fish, (m.get(c.fish) || 0) + 1);
+  return m;
+}
+// Reuse the existing spelling so "carp" and "Carp" stay one fish.
+function canonFish(raw) {
+  const n = clean(raw);
+  if (!n) return '';
+  const lc = n.toLowerCase();
+  const hit = S.catches.find(c => c.fish.toLowerCase() === lc);
+  return hit ? hit.fish : n;
+}
+
+// ---------- actions ----------
+
+function logCatch(raw) {
+  const fish = canonFish(raw);
+  if (!fish) return false;
+  const missing = S.categories.find(cat => S.current[cat.id] == null);
+  if (missing) { toast(`Pick a ${missing.name} first`); return false; }
+  const cond = {};
+  for (const cat of S.categories) cond[cat.id] = S.current[cat.id];
+  const rec = {id: uid(), t: Date.now(), fish, cond};
+  S.catches.push(rec);
+  save(); renderAll();
+  toast(`Logged ${fish}`, () => removeCatch(rec.id));
+  return true;
+}
+function removeCatch(id) {
+  const i = S.catches.findIndex(c => c.id === id);
+  if (i < 0) return null;
+  const [rec] = S.catches.splice(i, 1);
+  save(); renderAll();
+  return rec;
+}
+function deleteWithUndo(id) {
+  const rec = removeCatch(id);
+  if (!rec) return;
+  toast(`Deleted ${rec.fish} (${timeText(rec)})`, () => {
+    S.catches.push(rec);
+    S.catches.sort((a, b) => a.t - b.t);
+    save(); renderAll();
+  });
+}
+
+function mergeIn(d) {
+  if (!d || !Array.isArray(d.catches)) throw new Error('not a backup');
+  const idMap = {};
+  for (const ic of Array.isArray(d.categories) ? d.categories : []) {
+    if (!ic || typeof ic.name !== 'string') continue;
+    let local = S.categories.find(c => c.id === ic.id) || S.categories.find(c => c.name.toLowerCase() === ic.name.toLowerCase());
+    if (!local) { local = {id: String(ic.id || uid()), name: ic.name, options: []}; S.categories.push(local); }
+    idMap[ic.id] = local.id;
+    for (const o of Array.isArray(ic.options) ? ic.options : []) if (typeof o === 'string' && !local.options.includes(o)) local.options.push(o);
+  }
+  const have = new Set(S.catches.map(c => c.id));
+  let added = 0;
+  for (const r of d.catches) {
+    if (!r || typeof r.fish !== 'string' || !Number.isFinite(r.t)) continue;
+    const id = r.id ? String(r.id) : uid();
+    if (have.has(id)) continue;
+    const cond = {};
+    for (const [k, v] of Object.entries(r.cond || {})) if (typeof v === 'string') cond[idMap[k] || k] = v;
+    S.catches.push({id, t: r.t, fish: r.fish, cond, ...(r.note ? {note: true} : {}), ...(typeof r.hm === 'string' ? {hm: r.hm} : {})});
+    have.add(id);
+    added++;
+  }
+  S.catches.sort((a, b) => a.t - b.t);
+  return added;
+}
+
+// seed-notes.js (optional, next to this file) holds catches copied from paper notes.
+// Each seed is added once per browser, then remembered so deleting a note sticks.
+function applySeed(seed) {
+  if (!seed || !seed.id || !Array.isArray(seed.catches)) return;
+  S.seeds ||= [];
+  if (S.seeds.includes(seed.id)) return;
+  for (const [catId, opts] of Object.entries(seed.options || {})) {
+    const cat = catById(catId);
+    if (cat) for (const o of opts) if (!cat.options.includes(o)) cat.options.push(o);
+  }
+  // Notes have no real date: slot them in before the oldest catch, in written order.
+  const base = Math.min(Date.now() - 60000, ...S.catches.map(c => c.t));
+  const have = new Set(S.catches.map(c => c.id));
+  seed.catches.forEach((r, i) => {
+    const id = `${seed.id}-${i}`;
+    if (have.has(id) || typeof r.fish !== 'string') return;
+    const cond = {};
+    for (const [k, v] of Object.entries(r.cond || {})) if (catById(k)) cond[k] = v;
+    S.catches.push({id, t: base - (seed.catches.length - i) * 1000, fish: r.fish, cond, note: true, ...(r.time ? {hm: r.time} : {})});
+  });
+  S.catches.sort((a, b) => a.t - b.t);
+  S.seeds.push(seed.id);
+  save();
+}
+
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], {type}));
+  const a = Object.assign(document.createElement('a'), {href: url, download: name});
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function exportCsv() {
+  const cats = S.categories;
+  const rows = [['Date', 'Time', 'Weekday', 'Hour', 'Fish', ...cats.map(c => c.name)]];
+  for (const c of S.catches) {
+    const d = new Date(c.t);
+    rows.push([
+      c.note ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      c.note ? (c.hm || '') : fmtTime(c.t),
+      c.note ? '' : DAYS[d.getDay()],
+      hourOf(c) ?? '',
+      c.fish,
+      ...cats.map(cat => c.cond?.[cat.id] ?? ''),
+    ]);
+  }
+  const csv = rows.map(r => r.map(v => { v = String(v); return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }).join(',')).join('\r\n');
+  download(`cashtown-fishing-${stamp()}.csv`, '﻿' + csv, 'text/csv');
+}
+
+// ---------- small UI pieces ----------
+
+let toastTimer = 0;
+function toast(msg, undo) {
+  const el = $('#toast');
+  el.innerHTML = `<span>${esc(msg)}</span>` + (undo ? '<button class="btn small" type="button">Undo</button>' : '');
+  if (undo) {
+    let used = false;
+    el.querySelector('button').onclick = () => { if (used) return; used = true; el.classList.remove('show'); undo(); };
+  }
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), undo ? 6000 : 2600);
+}
+
+// Resolves from the buttons/keys directly; the dialog 'close' event isn't fired in every browser.
+let dlgDone = null;
+function ask({title, text = '', value = '', input = true, ok = 'OK', danger = false}) {
+  const d = $('#dlg'), inp = $('#dlgInput'), okBtn = $('#dlgOk');
+  dlgDone?.(false);
+  $('#dlgTitle').textContent = title;
+  $('#dlgText').textContent = text;
+  $('#dlgText').hidden = !text;
+  inp.hidden = !input;
+  inp.value = value;
+  okBtn.textContent = ok;
+  okBtn.classList.toggle('danger', danger);
+  d.showModal();
+  if (input) { inp.focus(); inp.select(); } else (danger ? $('#dlgCancel') : okBtn).focus();
+  return new Promise(res => {
+    dlgDone = confirmed => {
+      dlgDone = null;
+      if (d.open) d.close();
+      res(confirmed ? (input ? clean(inp.value) || null : true) : null);
+    };
+  });
+}
+
+function pixelSvg(rows, pal, scale) {
+  let rects = '';
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (pal[ch]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${pal[ch]}"/>`;
+  }));
+  const w = rows[0].length, h = rows.length;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+// One heat strip: 24 hours or 7 days. totals = all catches in that slot, for context.
+function strip(counts, totals, nowIdx, kind, labels) {
+  const max = Math.max(1, ...counts);
+  let h = `<div class="strip ${kind}">`;
+  counts.forEach((n, i) => {
+    const t = totals[i];
+    const name = kind === 'hour' ? hourName(i) : DAYS_LONG[WEEK[i]];
+    const tip = t ? `${name}: ${n} of ${t}` : `${name}: nothing logged yet`;
+    const cls = n ? 'hit' : t ? 'zero' : 'none';
+    h += `<span class="cell ${cls}${i === nowIdx ? ' now' : ''}"${n ? ` style="--p:${Math.round(35 + 65 * n / max)}%"` : ''} title="${tip}"></span>`;
+  });
+  h += '</div>';
+  if (labels) {
+    h += kind === 'hour'
+      ? '<div class="strip-labels"><span>0h</span><span>6h</span><span>12h</span><span>18h</span></div>'
+      : `<div class="strip-labels day">${WEEK.map(d => `<span>${DAYS[d].slice(0, 2)}</span>`).join('')}</div>`;
+  }
+  return h;
+}
+
+// [0,0,3,4,0,...] -> ["02:00–04:00"], wrapping past midnight.
+function hourRanges(hours) {
+  const on = hours.map(n => n > 0);
+  const start = on.indexOf(false);
+  if (start < 0) return [];
+  const out = [];
+  let cur = null;
+  for (let k = 1; k <= 24; k++) {
+    const i = (start + k) % 24;
+    if (on[i]) { if (cur) cur[1] = i; else cur = [i, i]; }
+    else if (cur) { out.push(cur); cur = null; }
+  }
+  if (cur) out.push(cur);
+  return out.map(([a, b]) => `${pad(a)}:00–${pad((b + 1) % 24)}:00`);
+}
+
+// ---------- render ----------
+
+function renderAll() {
+  renderStats(); renderConditions(); renderTabs(); renderView();
+  if (VIEW) renderAbout(); else renderCatchPanel();
+}
+
+function renderStats() {
+  const kinds = fishCounts().size;
+  $('#stats').innerHTML = `<b>${S.catches.length}</b> ${S.catches.length === 1 ? 'catch' : 'catches'} · <b>${kinds}</b> ${kinds === 1 ? 'kind' : 'kinds'} of fish`;
+}
+
+// Visitors choose conditions to look up; "Any" leaves that condition open.
+function renderPicker() {
+  let h = '';
+  for (const cat of S.categories) {
+    const cur = S.current[cat.id];
+    const chip = (v, label) => `<button class="chip" type="button" aria-pressed="${v === null ? cur == null : v === cur}" data-act="pick" data-cat="${esc(cat.id)}" data-val="${v === null ? '' : esc(v)}">${esc(label)}</button>`;
+    h += `<div class="cond-row"><div class="cond-label">${esc(cat.name)}</div><div class="chips">${chip(null, 'Any')}${valuesOf(cat).map(v => chip(v, v)).join('')}</div></div>`;
+  }
+  const now = new Date();
+  h += `<div class="cond-row"><div class="cond-label">Time</div><div class="auto-val"><b id="clockDay">${DAYS_LONG[now.getDay()]}</b> <b id="clockTime">${fmtTime(now)}</b><div class="hint">The game runs on real-world time.</div></div></div>`;
+  $('#conditions').innerHTML = h;
+  $('#condMeta').innerHTML = S.categories.some(cat => S.current[cat.id] != null)
+    ? '<button class="link" type="button" data-act="pickreset">Reset all</button>' : '';
+}
+
+function renderAbout() {
+  const live = S.catches.filter(c => !c.note), notes = S.catches.length - live.length;
+  const days = new Set(live.map(c => new Date(c.t).toDateString())).size;
+  const date = t => new Date(t).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+  const range = !live.length ? '—' : sameDay(live[0].t, live.at(-1).t) ? date(live[0].t) : `${date(live[0].t)} – ${date(live.at(-1).t)}`;
+  $('#about').innerHTML = `
+    <dl class="facts">
+      <div><dt>Catches logged</dt><dd>${S.catches.length}</dd></div>
+      <div><dt>Kinds of fish</dt><dd>${fishCounts().size}</dd></div>
+      <div><dt>Days of fishing</dt><dd>${days}</dd></div>
+      <div><dt>Logged between</dt><dd class="small">${range}</dd></div>
+    </dl>
+    <p class="hint">Each catch records the weather, lure and water depth used, plus the real-world time.${notes ? ` ${notes} early catches come from paper notes, so they have no date and mostly no weather; those show up as “unsure” or “not noted”.` : ''}</p>
+    <div class="row"><button class="btn ghost small" type="button" data-act="export-csv">Download the data (CSV)</button></div>`;
+}
+
+function renderConditions() {
+  if (VIEW) return renderPicker();
+  let h = '';
+  for (const cat of S.categories) {
+    const cur = S.current[cat.id];
+    h += `<div class="cond-row"><div class="cond-label">${esc(cat.name)}</div><div class="chips">`;
+    if (!cat.options.length && !ui.edit) h += '<span class="hint">No options yet. Tap ✎ Edit to add some.</span>';
+    for (const opt of cat.options) {
+      const a = `data-cat="${esc(cat.id)}" data-val="${esc(opt)}"`;
+      h += ui.edit
+        ? `<span class="chip editing"><button class="lbl" type="button" data-act="renameopt" ${a} title="Rename">${esc(opt)}</button><button class="x" type="button" data-act="rmopt" ${a} aria-label="Remove ${esc(opt)}">×</button></span>`
+        : `<button class="chip" type="button" aria-pressed="${opt === cur}" data-act="pick" ${a}>${esc(opt)}</button>`;
+    }
+    if (ui.edit) h += `<button class="chip add" type="button" data-act="addopt" data-cat="${esc(cat.id)}">+ Add</button>`;
+    h += '</div></div>';
+  }
+  const now = new Date();
+  h += `<div class="cond-row"><div class="cond-label">Day &amp; time</div><div class="auto-val"><b id="clockDay">${DAYS_LONG[now.getDay()]}</b> <b id="clockTime">${fmtTime(now)}</b> <span class="hint">· recorded automatically</span></div></div>`;
+  if (ui.edit) h += '<p class="hint">Tap an option to fix its name (past catches update too). × removes it from the list.</p>';
+  $('#conditions').innerHTML = h;
+
+  const since = S.catches.filter(c => c.t >= S.currentSince).length;
+  const at = sameDay(S.currentSince, Date.now()) ? fmtTime(S.currentSince) : fmtWhen(S.currentSince);
+  $('#condMeta').textContent = `since ${at} · ${plural(since, 'catch', 'catches')}`;
+  $('#editBtn').textContent = ui.edit ? 'Done' : '✎ Edit';
+  $('#editBtn').setAttribute('aria-pressed', ui.edit);
+}
+
+function renderCatchPanel() {
+  // Fish already seen with these conditions come first; the rest are faded.
+  const all = fishCounts(), here = new Map();
+  for (const c of S.catches) if (fits(c)) here.set(c.fish, (here.get(c.fish) || 0) + 1);
+  const names = [...all.keys()].sort((a, b) => (here.get(b) || 0) - (here.get(a) || 0) || all.get(b) - all.get(a) || a.localeCompare(b));
+  $('#fishList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+  $('#quick').innerHTML = names.length
+    ? names.map(n => `<button class="chip${here.get(n) ? '' : ' ghost'}" type="button" data-act="quicklog" data-fish="${esc(n)}" title="Log ${esc(n)} now">${esc(n)}${here.get(n) ? `<small>${here.get(n)}</small>` : ''}</button>`).join('')
+    : '<span class="hint">Fish you log show up here as one-tap buttons.</span>';
+  const recent = S.catches.slice(-5).reverse();
+  $('#recent').innerHTML = recent.length
+    ? recent.map(c => `<li><span class="t">${timeText(c)}</span><b>${esc(c.fish)}</b><span class="cnd">${esc(condText(c.cond))}</span><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></li>`).join('')
+    : '<li class="hint">Nothing yet.</li>';
+}
+
+function renderTabs() {
+  const needBackup = !API && !VIEW && S.catches.filter(c => c.t > (S.lastBackup || 0)).length >= 50;
+  $('#tabs').innerHTML = TABS.map(([id, label]) =>
+    `<button class="tab" type="button" role="tab" aria-selected="${ui.tab === id}" data-act="tab" data-tab="${id}">${label}${id === 'data' && needBackup ? '<span class="dot" title="Time for a backup">!</span>' : ''}</button>`).join('');
+}
+
+function renderView() {
+  const v = $('#view');
+  switch (ui.tab) {
+    case 'fish': v.innerHTML = fishShell(); fillFish(); break;
+    case 'combos': v.innerHTML = renderCombos(); break;
+    case 'log': v.innerHTML = logShell(); fillLog(); break;
+    case 'data': v.innerHTML = renderData(); break;
+    default: v.innerHTML = renderNow();
+  }
+}
+
+function renderNow() {
+  const now = new Date(), hour = now.getHours(), day = now.getDay();
+  let h;
+  if (VIEW) {
+    const picked = S.categories.filter(cat => S.current[cat.id] != null).map(cat => `${esc(cat.name)} <b>${esc(S.current[cat.id])}</b>`);
+    h = `<div class="panel-head"><h2>What bites</h2></div><p class="lead">${picked.length
+      ? `Fish caught with ${picked.join(' · ')}. A higher share means it turned up more often.`
+      : 'Every fish caught so far. Choose a weather, lure or water depth to narrow it down.'}</p>`;
+    h += '<div class="match"><span class="label">Also match</span>'
+      + `<button class="chip" type="button" aria-pressed="${ui.matchDay}" data-act="togglematch" data-cat="_day">Today · ${DAYS_LONG[day]}</button>`
+      + `<button class="chip" type="button" aria-pressed="${ui.matchHour}" data-act="togglematch" data-cat="_hour">This hour · ${hourName(hour)}</button></div>`;
+  } else {
+    h = '<div class="panel-head"><h2>What bites right now</h2></div><p class="lead">Fish you\'ve caught under your current conditions. Turn a match off to widen the search.</p>';
+    h += '<div class="match"><span class="label">Match</span>';
+    for (const cat of S.categories) {
+      h += `<button class="chip toggle" type="button" aria-pressed="${ui.match[cat.id] !== false}" data-act="togglematch" data-cat="${esc(cat.id)}">${esc(cat.name)}: ${esc(S.current[cat.id] ?? '—')}</button>`;
+    }
+    h += `<button class="chip toggle" type="button" aria-pressed="${ui.matchDay}" data-act="togglematch" data-cat="_day">${DAYS_LONG[day]}</button>`;
+    h += `<button class="chip toggle" type="button" aria-pressed="${ui.matchHour}" data-act="togglematch" data-cat="_hour">${hourName(hour)}</button></div>`;
+  }
+
+  if (!S.catches.length) return h + empty(VIEW ? 'No catches published yet.' : 'No catches logged yet. Set your conditions, go fish, and type in what you catch.');
+
+  // A catch counts unless it clearly disagrees. Missing info (paper notes, a newer
+  // condition type) doesn't rule it out, but it's flagged as "unsure".
+  const active = S.categories.filter(cat => (VIEW || ui.match[cat.id] !== false) && S.current[cat.id] != null);
+  const rows = [];
+  for (const c of S.catches) {
+    let unsure = false, ok = true;
+    for (const cat of active) {
+      const v = c.cond?.[cat.id];
+      if (v == null) unsure = true;
+      else if (v !== S.current[cat.id]) { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (ui.matchDay) { const d = dayOf(c); if (d == null) unsure = true; else if (d !== day) continue; }
+    if (ui.matchHour) { const hh = hourOf(c); if (hh == null) unsure = true; else if (hh !== hour) continue; }
+    rows.push({c, unsure});
+  }
+  if (!rows.length) return h + empty(VIEW
+    ? 'Nothing caught with this combination yet. Try “Any” for one of the conditions.'
+    : 'Nothing logged with this combination yet. Go test it, or turn off a match above.');
+
+  const byFish = new Map(), hourTot = Array(24).fill(0);
+  let unsureTotal = 0;
+  for (const {c, unsure} of rows) {
+    const hh = hourOf(c);
+    let f = byFish.get(c.fish);
+    if (!f) { f = {fish: c.fish, n: 0, unsure: 0, hrs: Array(24).fill(0)}; byFish.set(c.fish, f); }
+    f.n++;
+    if (unsure) { f.unsure++; unsureTotal++; }
+    if (hh != null) { hourTot[hh]++; f.hrs[hh]++; }
+  }
+  const sorted = [...byFish.values()].sort((a, b) => b.n - a.n || a.fish.localeCompare(b.fish));
+
+  h += `<p class="summary">Based on <b>${rows.length}</b> ${rows.length === 1 ? 'catch' : 'catches'}`
+    + (unsureTotal ? `. <span class="hint">${unsureTotal} of them are missing some of these conditions (e.g. weather wasn't noted), so they're marked unsure.</span>` : ':') + '</p>';
+  h += '<div class="table-wrap"><table><thead><tr><th>Fish</th><th class="num">Caught</th><th>Share</th><th>By hour <span class="hint">(outlined = now)</span></th></tr></thead><tbody>';
+  for (const {fish, hrs, n, unsure} of sorted) {
+    const pct = Math.round(n / rows.length * 100);
+    const unsureNote = unsure ? `<br><span class="hint" title="${unsure} of these catches didn't record every matched condition">${unsure === n ? 'all' : unsure} unsure</span>` : '';
+    h += `<tr><td><button class="link" type="button" data-act="openfish" data-fish="${esc(fish)}">${esc(fish)}</button></td><td class="num">${n}${unsureNote}</td>`
+      + `<td style="white-space:nowrap"><span class="bar"><span style="width:${pct}%"></span></span>${pct}%</td><td>${strip(hrs, hourTot, hour, 'hour', false)}</td></tr>`;
+  }
+  h += '</tbody></table></div>';
+
+  const all = fishCounts();
+  const missing = [...all.keys()].filter(n => !byFish.has(n)).sort((a, b) => all.get(b) - all.get(a));
+  if (missing.length) {
+    h += `<h3 class="sub">${VIEW ? 'Not caught with these conditions yet' : 'Not caught with this match yet'}</h3><div class="chips">${missing.map(n =>
+      `<button class="chip ghost" type="button" data-act="openfish" data-fish="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+  }
+  return h;
+}
+
+function fishShell() {
+  const sorts = [['count', 'Most caught'], ['rare', 'Rarest'], ['recent', 'Recently caught'], ['az', 'A–Z']];
+  return `<div class="panel-head"><h2>Fish guide</h2></div>
+    <p class="lead">Every fish ${VIEW ? 'caught so far' : 'you\'ve caught'}, and the conditions it turned up in.</p>
+    <div class="controls">
+      <input class="field" id="fishQ" type="search" placeholder="Search fish…" aria-label="Search fish" value="${esc(ui.fishQ)}">
+      <select class="field" id="fishSort" aria-label="Sort">${sorts.map(([v, l]) => `<option value="${v}"${ui.fishSort === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
+    </div>
+    <div class="legend">
+      <span><span class="tag seen">5</span> caught 5×</span>
+      <span><span class="tag zero">0</span> fished with it, never got this fish</span>
+      <span><span class="tag unknown">?</span> not tried yet</span>
+      <span><span class="tag unknown">not noted</span> info missing</span>
+      <span><span class="cell hit"></span>caught in that hour/day</span>
+    </div>
+    <div id="fishCards" class="cards"></div>`;
+}
+
+function fillFish() {
+  const box = $('#fishCards');
+  if (!box) return;
+  if (!S.catches.length) { box.innerHTML = empty('Your fish guide fills in as you log catches.'); return; }
+
+  const catTot = {}, vals = {};
+  for (const cat of S.categories) { catTot[cat.id] = new Map(); vals[cat.id] = valuesOf(cat); }
+  const hourTot = Array(24).fill(0), dayTot = Array(7).fill(0), fish = new Map();
+  for (const c of S.catches) {
+    const h = hourOf(c), dw = dayOf(c), d = dw == null ? null : WEEK.indexOf(dw);
+    if (h != null) hourTot[h]++;
+    if (d != null) dayTot[d]++;
+    let f = fish.get(c.fish);
+    if (!f) {
+      f = {name: c.fish, n: 0, last: 0, cat: {}, unk: {}, hours: Array(24).fill(0), days: Array(7).fill(0)};
+      for (const cat of S.categories) f.cat[cat.id] = new Map();
+      fish.set(c.fish, f);
+    }
+    f.n++;
+    if (!c.note) f.last = Math.max(f.last, c.t);
+    if (h != null) f.hours[h]++;
+    if (d != null) f.days[d]++;
+    for (const cat of S.categories) {
+      const v = c.cond?.[cat.id];
+      if (v == null) { f.unk[cat.id] = (f.unk[cat.id] || 0) + 1; continue; }
+      catTot[cat.id].set(v, (catTot[cat.id].get(v) || 0) + 1);
+      f.cat[cat.id].set(v, (f.cat[cat.id].get(v) || 0) + 1);
+    }
+  }
+
+  let list = [...fish.values()];
+  const q = ui.fishQ.trim().toLowerCase();
+  if (q) list = list.filter(f => f.name.toLowerCase().includes(q));
+  const sorters = {
+    count: (a, b) => b.n - a.n || a.name.localeCompare(b.name),
+    rare: (a, b) => a.n - b.n || a.name.localeCompare(b.name),
+    recent: (a, b) => b.last - a.last,
+    az: (a, b) => a.name.localeCompare(b.name),
+  };
+  list.sort(sorters[ui.fishSort] || sorters.count);
+  if (!list.length) { box.innerHTML = empty(`No fish matching “${ui.fishQ}”.`); return; }
+
+  const now = new Date();
+  box.innerHTML = list.map(f => {
+    let h = `<article class="fish-card"><header><h3>${esc(f.name)}</h3><span class="count">×${f.n}</span>`
+      + (VIEW ? '' : `<button class="btn small ghost" type="button" data-act="renamefish" data-fish="${esc(f.name)}">Rename</button>`) + '</header>'
+      + `<div class="last">${f.last ? `Last caught ${fmtWhen(f.last)}` : VIEW ? 'From early paper notes (no date)' : 'From your notes (no date)'}</div>`;
+    const cl = clues(f, catTot);
+    if (cl) h += `<div class="clues">${cl}</div>`;
+    for (const cat of S.categories) {
+      h += `<div class="facet"><span class="facet-label">${esc(cat.name)}</span><div class="chips tight">`;
+      for (const v of vals[cat.id]) {
+        const n = f.cat[cat.id].get(v) || 0, t = catTot[cat.id].get(v) || 0;
+        const tip = n ? `${n} of ${t} catches with ${v} were ${f.name}` : t ? `${t} catches with ${v}, none were ${f.name}` : `No catches logged with ${v} yet`;
+        h += `<span class="tag ${n ? 'seen' : t ? 'zero' : 'unknown'}" title="${esc(tip)}">${esc(v)}<b>${n || (t ? 0 : '?')}</b></span>`;
+      }
+      if (f.unk[cat.id]) h += `<span class="tag unknown" title="${esc(`${f.unk[cat.id]} catches didn't record ${cat.name}`)}">not noted<b>${f.unk[cat.id]}</b></span>`;
+      h += '</div></div>';
+    }
+    const noHours = f.hours.every(n => !n), noDays = f.days.every(n => !n);
+    h += `<div class="facet"><span class="facet-label">Hour</span><div>${noHours ? '<span class="hint">not noted</span>' : strip(f.hours, hourTot, now.getHours(), 'hour', true)}</div></div>`;
+    h += `<div class="facet"><span class="facet-label">Day</span><div>${noDays ? '<span class="hint">not noted</span>' : strip(f.days, dayTot, WEEK.indexOf(now.getDay()), 'day', true)}</div></div>`;
+    return h + '</article>';
+  }).join('');
+}
+
+// Short hints like "Deep only" or "06:00–09:00" when the data points that way.
+function clues(f, catTot) {
+  const out = [];
+  if (f.n >= 2) {
+    for (const cat of S.categories) {
+      const seen = [...f.cat[cat.id].keys()];
+      if (seen.length !== 1 || f.unk[cat.id]) continue;
+      const v = seen[0];
+      let other = 0;
+      for (const [k, t] of catTot[cat.id]) if (k !== v) other += t;
+      if (other > 0) out.push(`<span class="clue" title="${esc(`All ${f.n} catches were with ${v}. ${other} catches with other ${cat.name} options had none.`)}">${esc(v)} only</span>`);
+    }
+  }
+  const ranges = hourRanges(f.hours);
+  if (ranges.length && ranges.length <= 3) out.push(`<span class="clue soft" title="Hours it was caught">${ranges.join(', ')}</span>`);
+  const days = WEEK.filter((d, i) => f.days[i]).map(d => DAYS[d]);
+  if (days.length && days.length <= 4) out.push(`<span class="clue soft" title="Days it was caught">${days.join(', ')}</span>`);
+  return out.join('');
+}
+
+function renderCombos() {
+  let h = `<div class="panel-head"><h2>Combos</h2></div><p class="lead">Every combination ${VIEW ? 'fished so far' : 'you\'ve fished'} and what it gave. ★ = only caught with that combo so far.</p>`;
+  if (!S.catches.length) return h + empty(VIEW ? 'No catches published yet.' : 'No catches logged yet.');
+  const groups = new Map(), fishCombos = new Map();
+  for (const c of S.catches) {
+    const vals = S.categories.map(cat => c.cond?.[cat.id] ?? null);
+    const key = JSON.stringify(vals);
+    let g = groups.get(key);
+    if (!g) { g = {vals, key, n: 0, fish: new Map()}; groups.set(key, g); }
+    g.n++;
+    g.fish.set(c.fish, (g.fish.get(c.fish) || 0) + 1);
+    if (!fishCombos.has(c.fish)) fishCombos.set(c.fish, new Set());
+    fishCombos.get(c.fish).add(key);
+  }
+  const curKey = JSON.stringify(S.categories.map(cat => S.current[cat.id] ?? null));
+  h += '<div>';
+  for (const g of [...groups.values()].sort((a, b) => b.n - a.n)) {
+    const isCur = g.key === curKey;
+    h += `<div class="combo${isCur ? ' current' : ''}"><div class="combo-head"><div class="chips tight">`
+      + g.vals.map((v, i) => `<span class="tag cond" title="${esc(S.categories[i].name)}">${esc(v ?? '—')}</span>`).join('')
+      + `</div><span class="muted">${plural(g.n, 'catch', 'catches')}</span>`
+      + (isCur ? `<span class="now-badge">${VIEW ? 'selected' : 'current'}</span>`
+        : VIEW ? `<button class="btn small ghost" type="button" data-act="usecombo" data-key="${esc(g.key)}" title="See what bites with this combo">Show</button>`
+        : `<button class="btn small ghost" type="button" data-act="usecombo" data-key="${esc(g.key)}" title="Set these as your conditions">Use</button>`)
+      + '</div><div class="chips tight">'
+      + [...g.fish].sort((a, b) => b[1] - a[1]).map(([f, n]) =>
+        `<button class="tag seen" type="button" data-act="openfish" data-fish="${esc(f)}" title="${esc(`${n} of ${g.n} catches (${Math.round(n / g.n * 100)}%)`)}">${fishCombos.get(f).size === 1 ? '★ ' : ''}${esc(f)}<b>${n}</b></button>`).join('')
+      + '</div></div>';
+  }
+  return h + '</div>';
+}
+
+function logShell() {
+  return `<div class="panel-head"><h2>Log</h2><span class="meta">${plural(S.catches.length, 'catch', 'catches')}</span></div>
+    <div class="controls"><input class="field" id="logQ" type="search" placeholder="Filter by fish, condition or day…" aria-label="Filter log" value="${esc(ui.logQ)}"></div>
+    <div id="logRows"></div>`;
+}
+
+function fillLog() {
+  const box = $('#logRows');
+  if (!box) return;
+  if (!S.catches.length) { box.innerHTML = empty('Nothing logged yet.'); return; }
+  const q = ui.logQ.trim().toLowerCase();
+  let rows = S.catches.slice().reverse();
+  if (q) rows = rows.filter(c => [c.fish, DAYS_LONG[dayOf(c)] ?? '', ...S.categories.map(cat => c.cond?.[cat.id] ?? '')]
+    .some(s => String(s).toLowerCase().includes(q)));
+  if (!rows.length) { box.innerHTML = empty('No catches match that filter.'); return; }
+  const shown = ui.logAll ? rows : rows.slice(0, 200);
+  let h = `<div class="table-wrap"><table><thead><tr><th>When</th><th>Fish</th>${S.categories.map(c => `<th>${esc(c.name)}</th>`).join('')}<th><span class="sr">Delete</span></th></tr></thead><tbody>`;
+  for (const c of shown) {
+    h += `<tr><td class="when">${whenText(c)}</td><td><b>${esc(c.fish)}</b></td>${S.categories.map(cat => `<td>${esc(c.cond?.[cat.id] ?? '—')}</td>`).join('')}`
+      + `<td class="num"><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></td></tr>`;
+  }
+  h += '</tbody></table></div>';
+  if (shown.length < rows.length) h += `<p class="center"><button class="btn ghost" type="button" data-act="logall">Show all ${rows.length}</button></p>`;
+  box.innerHTML = h;
+}
+
+function renderData() {
+  const since = S.catches.filter(c => c.t > (S.lastBackup || 0)).length;
+  return `<div class="panel-head"><h2>Data</h2></div>
+    <h3 class="sub" style="margin-top:4px">Saving &amp; backup</h3>
+    ${API
+      ? `<p>Every change is saved automatically to <b>fishing-log.db</b> in the fishing folder (${plural(S.catches.length, 'catch', 'catches')}). Nothing to remember. Exporting is only for moving the log somewhere else.</p>`
+      : `<p><b>This page isn't connected to the database</b>, so your log (${plural(S.catches.length, 'catch', 'catches')}) is saved in this browser only. Open the log with <b>start.bat</b> and every change is saved to a file automatically.</p>`}
+    <div class="row">
+      <button class="btn" type="button" data-act="export-json">Export backup (.json)</button>
+      <button class="btn ghost" type="button" data-act="import">Import backup…</button>
+      <button class="btn ghost" type="button" data-act="export-csv">Export spreadsheet (.csv)</button>
+    </div>
+    <p class="hint">${API ? '' : `Last export: ${S.lastBackup ? fmtWhen(S.lastBackup) : 'never'}${since && S.lastBackup ? ` · ${plural(since, 'new catch', 'new catches')} since` : ''}. `}Importing merges: catches you already have are skipped.</p>
+${API ? renderWebsiteSection() : ''}
+    <h3 class="sub">Condition types</h3>
+    <p>Found something else that changes the fish, like bait, location, rod or season? Add it here and it gets its own row in Conditions.</p>
+    <ul class="cats">${S.categories.map(c => `<li><b>${esc(c.name)}</b><span class="muted">${plural(c.options.length, 'option', 'options')}</span><span class="spacer"></span>`
+      + `<button class="btn small ghost" type="button" data-act="renamecat" data-cat="${esc(c.id)}">Rename</button>`
+      + `<button class="btn small ghost" type="button" data-act="delcat" data-cat="${esc(c.id)}">Remove</button></li>`).join('')}</ul>
+    <button class="btn ghost" type="button" data-act="addcat">+ Add condition type</button>
+
+    <h3 class="sub">Start over</h3>
+    <p>Deletes every logged catch. Your conditions and options stay.</p>
+    <button class="btn danger" type="button" data-act="clearall"${S.catches.length ? '' : ' disabled'}>Delete all catches</button>`;
+}
+
+// Visitors: change one looked-up condition (null = Any). Remembered in their browser only.
+function setPick(catId, value, render = true) {
+  S.current[catId] = value;
+  ui.pick[catId] = value;
+  saveUi();
+  if (render) { renderConditions(); renderView(); }
+}
+
+function renderWebsiteSection() {
+  let h = '<h3 class="sub">Public website</h3>';
+  if (!pub?.enabled) {
+    return h + '<p class="hint">Not set up: this folder isn\'t connected to a GitHub repository, so nothing is uploaded.</p>';
+  }
+  const link = pub.url ? `<a href="${esc(pub.url)}" target="_blank" rel="noopener">${esc(pub.url)}</a>` : 'the website';
+  return h + `<p>Others can browse your fish guide at ${link}. It updates by itself 10 minutes after your last change, and when start.bat starts if something wasn't uploaded yet.</p>
+    <div class="row">
+      <button class="btn ghost" type="button" data-act="publish-now"${pub.running ? ' disabled' : ''}>Update website now</button>
+      <a class="btn ghost" href="?view" target="_blank" rel="noopener">Preview the public page</a>
+    </div>
+    <p class="hint">${esc(pubText())}${pub.last ? ` · last uploaded ${fmtWhen(pub.last)}` : ''}</p>
+    ${pub.error ? `<p class="hint">Reason: ${esc(pub.error)}. Usually no internet, or the GitHub login on this PC expired (run <b>gh auth login</b>). Your catches are safe in fishing-log.db either way.</p>` : ''}`;
+}
+
+// ---------- events ----------
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const {act, cat: catId, val, id, fish, key, tab} = b.dataset;
+  const cat = catId ? catById(catId) : null;
+
+  switch (act) {
+    case 'pick':
+      if (VIEW) { setPick(catId, val || null); break; }
+      if (S.current[catId] !== val) { S.current[catId] = val; S.currentSince = Date.now(); save(); renderAll(); }
+      break;
+    case 'pickreset':
+      for (const c of S.categories) setPick(c.id, null, false);
+      renderConditions(); renderView();
+      break;
+    case 'publish-now':
+      publishNow();
+      break;
+    case 'theme':
+      ui.theme = val; saveUi(); applyTheme();
+      break;
+    case 'edit':
+      ui.edit = !ui.edit; renderConditions();
+      break;
+    case 'addopt': {
+      if (!cat) break;
+      const v = await ask({title: `Add a ${cat.name} option`, text: 'Type it the way the game shows it.', ok: 'Add'});
+      if (!v) break;
+      if (cat.options.some(o => o.toLowerCase() === v.toLowerCase())) { toast(`${v} is already there`); break; }
+      cat.options.push(v);
+      if (S.current[cat.id] == null) { S.current[cat.id] = v; S.currentSince = Date.now(); }
+      save(); renderAll();
+      break;
+    }
+    case 'renameopt': {
+      if (!cat) break;
+      const v = await ask({title: `Rename “${val}”`, text: 'Past catches with this option get the new name too.', value: val, ok: 'Rename'});
+      if (!v || v === val) break;
+      if (cat.options.some(o => o !== val && o.toLowerCase() === v.toLowerCase())) { toast(`${v} already exists`); break; }
+      cat.options = cat.options.map(o => o === val ? v : o);
+      for (const c of S.catches) if (c.cond?.[cat.id] === val) c.cond[cat.id] = v;
+      if (S.current[cat.id] === val) S.current[cat.id] = v;
+      save(); renderAll();
+      break;
+    }
+    case 'rmopt': {
+      if (!cat) break;
+      cat.options = cat.options.filter(o => o !== val);
+      if (S.current[cat.id] === val) {
+        if (cat.options.length) S.current[cat.id] = cat.options[0]; else delete S.current[cat.id];
+        S.currentSince = Date.now();
+      }
+      save(); renderAll();
+      toast(`Removed ${val}. Past catches keep it.`);
+      break;
+    }
+    case 'quicklog':
+      logCatch(fish);
+      break;
+    case 'del':
+      deleteWithUndo(id);
+      break;
+    case 'tab':
+      ui.tab = tab; ui.logAll = false; saveUi(); renderTabs(); renderView();
+      break;
+    case 'togglematch':
+      if (catId === '_day') ui.matchDay = !ui.matchDay;
+      else if (catId === '_hour') ui.matchHour = !ui.matchHour;
+      else ui.match[catId] = ui.match[catId] === false;
+      saveUi(); renderView();
+      break;
+    case 'openfish':
+      ui.fishQ = fish; ui.tab = 'fish'; saveUi(); renderTabs(); renderView();
+      $('#view').scrollIntoView({behavior: 'smooth', block: 'start'});
+      break;
+    case 'renamefish': {
+      const v = await ask({title: `Rename “${fish}”`, text: 'Fixes the name on every catch. Type an existing fish name to merge the two.', value: fish, ok: 'Rename'});
+      if (!v || v === fish) break;
+      const other = [...fishCounts().keys()].find(n => n !== fish && n.toLowerCase() === v.toLowerCase());
+      const target = other || v;
+      for (const c of S.catches) if (c.fish === fish) c.fish = target;
+      if (ui.fishQ === fish) ui.fishQ = target;
+      save(); renderAll();
+      toast(other ? `Merged into ${target}` : `Renamed to ${target}`);
+      break;
+    }
+    case 'usecombo': {
+      const vals = JSON.parse(key);
+      if (VIEW) {
+        S.categories.forEach((c, i) => setPick(c.id, vals[i] ?? null, false));
+        ui.tab = 'now'; saveUi(); renderConditions(); renderTabs(); renderView();
+        $('#view').scrollIntoView({behavior: 'smooth', block: 'start'});
+        break;
+      }
+      S.categories.forEach((c, i) => { if (vals[i] != null) S.current[c.id] = vals[i]; });
+      S.currentSince = Date.now();
+      save(); renderAll();
+      toast('Conditions set');
+      break;
+    }
+    case 'logall':
+      ui.logAll = true; fillLog();
+      break;
+    case 'export-json':
+      S.lastBackup = Date.now(); save();
+      download(`cashtown-fishing-backup-${stamp()}.json`, JSON.stringify(S, null, 1), 'application/json');
+      renderTabs(); renderView();
+      toast('Backup saved to your downloads');
+      break;
+    case 'export-csv':
+      exportCsv();
+      break;
+    case 'import':
+      $('#importFile').click();
+      break;
+    case 'addcat': {
+      const name = await ask({title: 'New condition type', text: 'For example Bait, Location, Rod or Season.', ok: 'Add'});
+      if (!name) break;
+      if (S.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) { toast(`${name} already exists`); break; }
+      S.categories.push({id: uid(), name, options: []});
+      ui.edit = true;
+      save(); renderAll();
+      toast(`Now add some ${name} options in Conditions`);
+      break;
+    }
+    case 'renamecat': {
+      if (!cat) break;
+      const name = await ask({title: `Rename “${cat.name}”`, value: cat.name, ok: 'Rename'});
+      if (!name || name === cat.name) break;
+      cat.name = name;
+      save(); renderAll();
+      break;
+    }
+    case 'delcat': {
+      if (!cat) break;
+      const yes = await ask({title: `Remove ${cat.name}?`, text: `It disappears from Conditions and the stats. Past catches keep their ${cat.name} values inside backups.`, input: false, ok: 'Remove', danger: true});
+      if (!yes) break;
+      S.categories = S.categories.filter(c => c.id !== cat.id);
+      delete S.current[cat.id];
+      save(); renderAll();
+      break;
+    }
+    case 'clearall': {
+      const yes = await ask({title: 'Delete all catches?', text: `All ${S.catches.length} catches will be gone for good. Export a backup first if you might want them.`, input: false, ok: 'Delete all', danger: true});
+      if (!yes) break;
+      S.catches = [];
+      save(); renderAll();
+      toast('Log cleared');
+      break;
+    }
+  }
+});
+
+$('#catchForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const inp = $('#fishInput');
+  if (logCatch(inp.value)) inp.value = '';
+  inp.focus();
+});
+
+$('#importFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data && Array.isArray(data.categories) && Array.isArray(data.catches)) normalize(data); // old exports use old names
+    const added = mergeIn(data);
+    save(); renderAll();
+    toast(`Imported ${plural(added, 'new catch', 'new catches')}`);
+  } catch {
+    toast("That file isn't a fishing log backup.");
+  }
+});
+
+$('#dlgOk').addEventListener('click', () => dlgDone?.(true));
+$('#dlgCancel').addEventListener('click', () => dlgDone?.(false));
+$('#dlg').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'dlgInput') { e.preventDefault(); dlgDone?.(true); }
+  else if (e.key === 'Escape') { e.preventDefault(); dlgDone?.(false); }
+});
+$('#dlg').addEventListener('close', () => dlgDone?.(false));
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'fishQ') { ui.fishQ = e.target.value; fillFish(); }
+  else if (e.target.id === 'logQ') { ui.logQ = e.target.value; ui.logAll = false; fillLog(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'fishSort') { ui.fishSort = e.target.value; saveUi(); fillFish(); }
+});
+
+// "/" jumps to the fish box from anywhere.
+document.addEventListener('keydown', e => {
+  if (VIEW || e.key !== '/' || e.ctrlKey || e.metaKey || $('#dlg').open) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
+  e.preventDefault();
+  $('#fishInput').focus();
+});
+
+// Another tab of this page saved: pick up its changes instead of overwriting them.
+window.addEventListener('storage', e => {
+  if (e.key === KEY && !VIEW) { S = load(); renderAll(); }
+});
+
+let lastHour = new Date().getHours();
+function tick() {
+  const now = new Date();
+  const d = $('#clockDay'), t = $('#clockTime');
+  if (d) d.textContent = DAYS_LONG[now.getDay()];
+  if (t) t.textContent = fmtTime(now);
+  if (now.getHours() !== lastHour) {
+    lastHour = now.getHours();
+    if (ui.tab === 'now' || ui.tab === 'fish') renderView();
+  }
+}
+setInterval(tick, 10000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+
+// ---------- start ----------
+
+const FISH_PX = [
+  '...kkkkk......',
+  '.kkbbbbbkk..kk',
+  'kbkbbbbbbbkkbk',
+  'kbbbbbbbbbbbbk',
+  'kbbbbbbbbbkkbk',
+  '.kklllllkk..kk',
+  '...kkkkk......',
+];
+const fishSvg = pixelSvg(FISH_PX, {k: '#2a1a0e', b: '#4fa3dc', l: '#c9ecff'}, 4);
+$('#logo').innerHTML = fishSvg;
+$('#favicon').href = 'data:image/svg+xml,' + encodeURIComponent(fishSvg);
+
+function applyTheme() {
+  const root = document.documentElement;
+  if (ui.theme === 'light' || ui.theme === 'dark') root.dataset.theme = ui.theme;
+  else delete root.dataset.theme;
+  $('#themeSwitch').innerHTML = [['auto', 'Auto', 'Follow the browser setting'], ['light', 'Light', ''], ['dark', 'Dark', '']]
+    .map(([v, label, tip]) => `<button class="chip" type="button" data-act="theme" data-val="${v}" aria-pressed="${(ui.theme || 'auto') === v}"${tip ? ` title="${tip}"` : ''}>${label}</button>`).join('');
+}
+applyTheme();
+
+if (VIEW) {
+  // Public, read-only guide.
+  $('#notice').hidden = false;
+  $('#aboutPanel').hidden = false;
+  $('#catchPanel').hidden = true;
+  $('#editBtn').hidden = true;
+  $('#condTitle').textContent = 'Choose conditions';
+  loadPublished();
+} else if (API) {
+  // Show what this browser has right away, then switch to the database copy.
+  renderAll();
+  renderDb();
+  connectDb();
+  setInterval(refreshPub, 60000);
+} else {
+  applySeed(window.CASHTOWN_SEED);
+  save();
+  renderAll();
+  watchForServer();
+}
+})();
+</script>
+</body>
+</html>

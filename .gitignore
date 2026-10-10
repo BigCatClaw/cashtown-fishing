@@ -1,0 +1,7 @@
+# The private log and local-only files. The website uses data.json instead.
+fishing-log.db
+fishing-log.db-journal
+__pycache__/
+.claude/
+cashtown-fishing-backup-*.json
+cashtown-fishing-*.csv
