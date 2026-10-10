@@ -16,7 +16,7 @@
 <link rel="icon" id="favicon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet">
 <script>
   // Apply a chosen Light/Dark theme before the page paints (Auto follows the browser).
   try {
@@ -67,11 +67,13 @@
     color-scheme:dark;
   }
   html,body{margin:0}
+  /* Readable font for everything; the pixel font only for titles, headings and tabs. */
   body{
-    font-family:'Pixelify Sans','Mitr',ui-monospace,Consolas,monospace;
+    font-family:'Mitr',system-ui,sans-serif;
     font-size:17px;line-height:1.45;color:var(--ink);min-height:100vh;
     background:var(--page) repeating-linear-gradient(180deg,transparent 0 44px,var(--page2) 44px 48px);
   }
+  h1,.top small,.panel-head h2,.tab,.notice-tag,.mini-label,.match .label{font-family:'Pixelify Sans','Mitr',system-ui,sans-serif}
   button{font-family:inherit}
   :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
@@ -95,7 +97,7 @@
   .top .stats{margin-left:auto;font-size:16px;text-align:right}
   .db{font-size:13px;margin-top:2px}
   .db.ok::before{content:'';display:inline-block;width:8px;height:8px;background:#8fdc6a;margin-right:6px;vertical-align:1px}
-  .db.warn{color:#ffd27a}
+  .db.bad{color:#ffd27a}
   .theme{display:inline-flex;gap:8px;margin-top:8px;padding:2px;text-shadow:none}
   .theme .chip{font-size:13px;padding:1px 8px}
   .banner{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);padding:12px 16px;box-shadow:var(--px3)}
@@ -506,7 +508,7 @@ function renderDb() {
     pubEl.hidden = true;
     return;
   }
-  let cls = 'warn', text;
+  let cls = 'bad', text;
   if (db === 'off') text = 'Browser only, not in the database';
   else if (db === 'connecting') { cls = ''; text = 'Connecting to database…'; }
   else if (db === 'offline') text = 'Database not reachable, retrying (kept in browser meanwhile)';
@@ -517,7 +519,7 @@ function renderDb() {
   const p = db === 'ok' ? pubText() : '';
   pubEl.hidden = !p;
   pubEl.textContent = p;
-  pubEl.className = `db${pub?.error ? ' warn' : ''}`;
+  pubEl.className = `db${pub?.error ? ' bad' : ''}`;
   $('#warn').hidden = storageOk || db === 'ok';
 }
 
