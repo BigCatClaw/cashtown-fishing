@@ -362,14 +362,15 @@ function fmtWhen(t) {
 
 function defaults() {
   return {
-    version: 5,
+    version: 6,
     categories: [
       {id: 'location', name: 'Location', options: ['ลำธารหมู่บ้าน']},
+      {id: 'spot', name: 'Spot', options: ['ไม่มี', 'น้ำวน', 'กลางกระแส', 'ใต้ร่มหิน']},
       {id: 'weather', name: 'Weather', options: ['ปลอดโปร่ง', 'ฝนตก']},
       {id: 'lure', name: 'Lure', options: ['ไส้เดือน', 'แป้ง', 'ปลาซิว', 'โดโจ', 'แมลงปอ', 'จิ้งหรีด', 'ตั๊กแตน']},
       {id: 'water', name: 'Water', options: ['น้ำตื้น', 'น้ำลึก']},
     ],
-    current: {location: 'ลำธารหมู่บ้าน', weather: 'ปลอดโปร่ง', lure: 'ไส้เดือน', water: 'น้ำลึก'},
+    current: {location: 'ลำธารหมู่บ้าน', spot: 'ไม่มี', weather: 'ปลอดโปร่ง', lure: 'ไส้เดือน', water: 'น้ำลึก'},
     currentSince: Date.now(),
     catches: [],
     lastBackup: 0,
@@ -391,15 +392,21 @@ function migrate(d) {
     // Location became a condition later; every catch before that was at the village stream.
     addConditionForAll(d, 'location', 'Location', 'ลำธารหมู่บ้าน');
   }
-  d.version = 5;
+  if (v < 6) {
+    // Casting spots came with a newer location; earlier catches had no spot to pick.
+    addConditionForAll(d, 'spot', 'Spot', 'ไม่มี', {after: 'location', options: ['น้ำวน', 'กลางกระแส', 'ใต้ร่มหิน']});
+  }
+  d.version = 6;
 }
-function addConditionForAll(d, catId, name, value) {
+// New condition type whose value is known for every catch so far. Without `after` it goes
+// first (where you fish comes before what you use).
+function addConditionForAll(d, catId, name, value, {after = null, options = []} = {}) {
   let cat = d.categories.find(c => c.id === catId);
   if (!cat) {
     cat = {id: catId, name, options: []};
-    d.categories.unshift(cat); // shown first: where you fish comes before what you use
+    d.categories.splice(after ? d.categories.findIndex(c => c.id === after) + 1 : 0, 0, cat);
   }
-  if (!cat.options.includes(value)) cat.options.unshift(value);
+  for (const o of [value, ...options]) if (!cat.options.includes(o)) cat.options.push(o);
   for (const c of d.catches) {
     c.cond ||= {};
     if (c.cond[catId] == null) c.cond[catId] = value;
