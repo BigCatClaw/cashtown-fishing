@@ -526,6 +526,7 @@ async function connectDb() {
   renderAll();
   takeCarried();
   refreshPub();
+  pullInbox();
 }
 
 async function push() {
@@ -582,6 +583,48 @@ function pubText() {
   if (pub.due) return `Website: updates at ${fmtTime(pub.due)}`;
   return 'Website: up to date';
 }
+// ---------- catches detected in the game (cashtown-autolog.user.js → server inbox) ----------
+
+let pullingInbox = false;
+async function pullInbox() {
+  if (!API || db !== 'ok' || pullingInbox) return;
+  pullingInbox = true;
+  try {
+    const res = await fetch('api/inbox', {cache: 'no-store'});
+    if (!res.ok) return;
+    const have = new Set(S.catches.map(c => c.id));
+    const items = (await res.json()).filter(it => it && it.id && typeof it.fish === 'string' && !have.has(it.id));
+    if (!items.length) return;
+    for (const it of items) {
+      // Conditions as set in this log when the fish was caught; the game supplies the water depth.
+      const cond = {};
+      for (const cat of S.categories) {
+        const v = it.cond?.[cat.id] ?? S.current[cat.id];
+        if (v == null) continue;
+        cond[cat.id] = v;
+        if (!cat.options.includes(v)) cat.options.push(v);
+      }
+      S.catches.push({id: it.id, t: Number.isFinite(it.t) ? it.t : Date.now(), fish: canonFish(it.fish), cond,
+        ...(Number.isFinite(it.size) ? {size: it.size} : {})});
+    }
+    S.catches.sort((a, b) => a.t - b.t);
+    const water = items.at(-1).cond?.water;
+    if (water && catById('water') && S.current.water !== water) S.current.water = water;
+    save(); renderAll();
+    toast(`From the game: ${summarizeFish(items.map(it => canonFish(it.fish)))}`);
+  } catch {
+    // the next poll tries again
+  } finally {
+    pullingInbox = false;
+  }
+}
+function summarizeFish(names) {
+  const counts = new Map();
+  for (const n of names) counts.set(n, (counts.get(n) || 0) + 1);
+  return [...counts].map(([n, k]) => (k > 1 ? `${n} ×${k}` : n)).join(', ');
+}
+const sizeText = c => (Number.isFinite(c.size) ? ` <span class="hint">${c.size} cm</span>` : '');
+
 async function refreshPub() {
   if (!API || db !== 'ok') return;
   try {
@@ -786,7 +829,8 @@ function mergeIn(d) {
     if (have.has(id)) continue;
     const cond = {};
     for (const [k, v] of Object.entries(r.cond || {})) if (typeof v === 'string') cond[idMap[k] || k] = v;
-    S.catches.push({id, t: r.t, fish: r.fish, cond, ...(r.note ? {note: true} : {}), ...(typeof r.hm === 'string' ? {hm: r.hm} : {})});
+    S.catches.push({id, t: r.t, fish: r.fish, cond, ...(r.note ? {note: true} : {}), ...(typeof r.hm === 'string' ? {hm: r.hm} : {}),
+      ...(Number.isFinite(r.size) ? {size: r.size} : {})});
     have.add(id);
     added++;
   }
@@ -828,7 +872,7 @@ function download(name, text, type) {
 }
 function exportCsv() {
   const cats = S.categories;
-  const rows = [['Date', 'Time', 'Weekday', 'Hour', 'Fish', ...cats.map(c => c.name)]];
+  const rows = [['Date', 'Time', 'Weekday', 'Hour', 'Fish', 'Size (cm)', ...cats.map(c => c.name)]];
   for (const c of S.catches) {
     const d = new Date(c.t);
     rows.push([
@@ -837,6 +881,7 @@ function exportCsv() {
       c.note ? '' : DAYS[d.getDay()],
       hourOf(c) ?? '',
       c.fish,
+      c.size ?? '',
       ...cats.map(cat => c.cond?.[cat.id] ?? ''),
     ]);
   }
@@ -1009,7 +1054,7 @@ function renderCatchPanel() {
     : '<span class="hint">Fish you log show up here as one-tap buttons.</span>';
   const recent = S.catches.slice(-5).reverse();
   $('#recent').innerHTML = recent.length
-    ? recent.map(c => `<li><span class="t">${timeText(c)}</span><b class="${rareCls(c.fish)}">${esc(c.fish)}</b><span class="cnd">${esc(condText(c.cond))}</span><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></li>`).join('')
+    ? recent.map(c => `<li><span class="t">${timeText(c)}</span><b class="${rareCls(c.fish)}">${esc(c.fish)}</b>${sizeText(c)}<span class="cnd">${esc(condText(c.cond))}</span><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></li>`).join('')
     : '<li class="hint">Nothing yet.</li>';
 }
 
@@ -1146,6 +1191,7 @@ function fillFish() {
     }
     f.n++;
     if (!c.note) f.last = Math.max(f.last, c.t);
+    if (Number.isFinite(c.size)) f.max = Math.max(f.max || 0, c.size);
     if (h != null) f.hours[h]++;
     if (d != null) f.days[d]++;
     for (const cat of S.categories) {
@@ -1177,7 +1223,8 @@ function fillFish() {
       : `<button class="gem-btn" type="button" data-act="rare" data-fish="${esc(f.name)}" aria-pressed="${rare}" aria-label="Rare fish" title="${rare ? 'Tagged as rare. Click to untag' : 'Tag as a rare fish'}">${GEM}</button>`;
     let h = `<article class="fish-card"><header><h3 class="${rareCls(f.name)}">${esc(f.name)}</h3>${gem}<span class="count">×${f.n}</span>`
       + (VIEW ? '' : `<button class="btn small ghost" type="button" data-act="renamefish" data-fish="${esc(f.name)}">Rename</button>`) + '</header>'
-      + `<div class="last">${f.last ? `Last caught ${fmtWhen(f.last)}` : VIEW ? 'From early paper notes (no date)' : 'From your notes (no date)'}</div>`;
+      + `<div class="last">${f.last ? `Last caught ${fmtWhen(f.last)}` : VIEW ? 'From early paper notes (no date)' : 'From your notes (no date)'}`
+      + `${f.max ? ` · biggest ${f.max} cm` : ''}</div>`;
     const cl = clues(f, catTot);
     if (cl) h += `<div class="clues">${cl}</div>`;
     for (const cat of S.categories) {
@@ -1267,7 +1314,7 @@ function fillLog() {
   const shown = ui.logAll ? rows : rows.slice(0, 200);
   let h = `<div class="table-wrap"><table><thead><tr><th>When</th><th>Fish</th>${S.categories.map(c => `<th>${esc(c.name)}</th>`).join('')}<th><span class="sr">Delete</span></th></tr></thead><tbody>`;
   for (const c of shown) {
-    h += `<tr><td class="when">${whenText(c)}</td><td><b class="${rareCls(c.fish)}">${esc(c.fish)}</b></td>${S.categories.map(cat => `<td>${esc(c.cond?.[cat.id] ?? '—')}</td>`).join('')}`
+    h += `<tr><td class="when">${whenText(c)}</td><td><b class="${rareCls(c.fish)}">${esc(c.fish)}</b>${sizeText(c)}</td>${S.categories.map(cat => `<td>${esc(c.cond?.[cat.id] ?? '—')}</td>`).join('')}`
       + `<td class="num"><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></td></tr>`;
   }
   h += '</tbody></table></div>';
@@ -1591,6 +1638,8 @@ if (VIEW) {
   renderDb();
   connectDb();
   setInterval(refreshPub, 60000);
+  setInterval(pullInbox, 2000); // catches sent by the game add-on
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pullInbox(); });
 } else {
   applySeed(window.CASHTOWN_SEED);
   save();

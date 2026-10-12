@@ -5,6 +5,10 @@ It also keeps the public website up to date: 10 minutes after the last change it
 data.json and pushes it to GitHub, where GitHub Pages serves it. That only happens when
 this folder is a git repository with a GitHub remote.
 
+Catches detected in the game by cashtown-autolog.user.js arrive in an inbox (stamped with
+the conditions set in the log at that moment); the open log page picks them up and saves
+them like any other catch.
+
 Run:  python server.py     (or double-click start.bat)
 Options:  --port 8765  --no-browser  --no-publish
 """
@@ -45,9 +49,13 @@ def connect():
             conditions  TEXT NOT NULL,      -- {"Weather": "ฝนตก", "Lure": "ไส้เดือน", "Water": "น้ำลึก"}
             cond        TEXT NOT NULL,      -- same values keyed by condition id (used by the page)
             from_notes  INTEGER NOT NULL DEFAULT 0,
-            note_time   TEXT
+            note_time   TEXT,
+            size        REAL                -- length in cm, when the game reported it
         )''')
+    if 'size' not in [row[1] for row in conn.execute('PRAGMA table_info(catches)')]:
+        conn.execute('ALTER TABLE catches ADD COLUMN size REAL')  # databases made before sizes
     conn.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+    conn.execute('CREATE TABLE IF NOT EXISTS inbox (id TEXT PRIMARY KEY, t INTEGER NOT NULL, item TEXT NOT NULL)')
     return conn
 
 
@@ -56,13 +64,15 @@ def load_state(conn):
     if not settings:
         return None
     catches = []
-    for id_, t, fish, cond, note, note_time in conn.execute(
-            'SELECT id, t, fish, cond, from_notes, note_time FROM catches ORDER BY t'):
+    for id_, t, fish, cond, note, note_time, size in conn.execute(
+            'SELECT id, t, fish, cond, from_notes, note_time, size FROM catches ORDER BY t'):
         c = {'id': id_, 't': t, 'fish': fish, 'cond': json.loads(cond)}
         if note:
             c['note'] = True
         if note_time:
             c['hm'] = note_time
+        if size is not None:
+            c['size'] = size
         catches.append(c)
     return {**settings, 'catches': catches}
 
@@ -72,6 +82,8 @@ def save_state(conn, state):
             or not isinstance(state.get('categories'), list):
         raise ValueError('not a fishing log')
     names = {c['id']: c['name'] for c in state['categories']}
+    # A page loaded before sizes existed sends catches without them; keep the saved ones.
+    old_sizes = dict(conn.execute('SELECT id, size FROM catches WHERE size IS NOT NULL'))
     rows = []
     for c in state['catches']:
         cond = c.get('cond') or {}
@@ -84,24 +96,63 @@ def save_state(conn, state):
             d = datetime.fromtimestamp(c['t'] / 1000)
             caught_at, weekday, hour = d.strftime('%Y-%m-%d %H:%M'), WEEKDAYS[d.weekday()], d.hour
         readable = {name: cond[k] for k, name in names.items() if k in cond}  # in condition order
+        size = c.get('size')
+        if not isinstance(size, (int, float)) or isinstance(size, bool):
+            size = old_sizes.get(str(c['id']))
         rows.append((str(c['id']), int(c['t']), caught_at, weekday, hour, str(c['fish']),
                      json.dumps(readable, ensure_ascii=False), json.dumps(cond, ensure_ascii=False),
-                     int(note), hm))
+                     int(note), hm, size))
     with conn:  # one transaction: the file never holds half a save
         # A page loaded before a setting existed (e.g. "rare") doesn't send it; keep the saved one.
         kept = [(k, v) for k, v in conn.execute('SELECT key, value FROM settings') if k not in state]
         conn.execute('DELETE FROM catches')
-        conn.executemany('INSERT INTO catches VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
+        conn.executemany('INSERT INTO catches (id, t, caught_at, weekday, hour, fish, conditions, cond, '
+                         'from_notes, note_time, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
         conn.execute('DELETE FROM settings')
         conn.executemany('INSERT INTO settings VALUES (?, ?)',
                          [(k, json.dumps(state[k], ensure_ascii=False)) for k in SETTINGS if k in state] + kept)
+        conn.execute('DELETE FROM inbox WHERE id IN (SELECT id FROM catches)')  # picked up by the page
+
+
+# ---------- catches from the game (cashtown-autolog.user.js) ----------
+
+def add_to_inbox(conn, catches):
+    """Queue catches for the log page, stamped with the conditions set right now."""
+    row = conn.execute("SELECT value FROM settings WHERE key = 'current'").fetchone()
+    current = json.loads(row[0]) if row else {}
+    added = 0
+    with conn:
+        for c in catches if isinstance(catches, list) else []:
+            if not isinstance(c, dict):
+                continue
+            fish = str(c.get('fish') or '').strip()[:80]
+            id_ = str(c.get('id') or '').strip()[:64]
+            if not fish or not id_ or conn.execute('SELECT 1 FROM catches WHERE id = ?', (id_,)).fetchone():
+                continue
+            t = c.get('t')
+            t = int(t) if isinstance(t, (int, float)) and not isinstance(t, bool) else int(time.time() * 1000)
+            cond = dict(current)
+            water = c.get('water')
+            if isinstance(water, str) and water.strip():
+                cond['water'] = water.strip()[:40]  # the game shows the depth it was cast into
+            item = {'id': id_, 't': t, 'fish': fish, 'cond': cond}
+            size = c.get('size')
+            if isinstance(size, (int, float)) and not isinstance(size, bool):
+                item['size'] = float(size)
+            added += conn.execute('INSERT OR IGNORE INTO inbox VALUES (?, ?, ?)',
+                                  (id_, t, json.dumps(item, ensure_ascii=False))).rowcount
+    return added
+
+
+def read_inbox(conn):
+    return [json.loads(item) for (item,) in conn.execute('SELECT item FROM inbox ORDER BY t')]
 
 
 # ---------- public website ----------
 
 def public_data(state):
     """The part of the log the public page needs (no ids, current picks or other settings)."""
-    keep = ('t', 'fish', 'cond', 'note', 'hm')
+    keep = ('t', 'fish', 'cond', 'note', 'hm', 'size')
     return {
         'version': state.get('version'),
         'categories': state['categories'],
@@ -250,7 +301,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def api(self):
         path = self.path.split('?')[0]
-        return path if path in ('/api/state', '/api/publish') else None
+        return path if path in ('/api/state', '/api/publish', '/api/inbox') else None
 
     def from_this_pc(self):
         # Only answer pages opened as localhost, not some other site pointing a name at us.
@@ -286,10 +337,10 @@ class Handler(SimpleHTTPRequestHandler):
         with db_lock:
             conn = connect()
             try:
-                state = load_state(conn)
+                result = read_inbox(conn) if api == '/api/inbox' else load_state(conn)
             finally:
                 conn.close()
-        self.send_json(200, state)  # null until the first save
+        self.send_json(200, result)  # state is null until the first save
 
     def do_PUT(self):
         if self.api() != '/api/state':
@@ -311,15 +362,32 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json(200, {'ok': True, 'catches': len(state['catches']), 'publish': publisher.status()})
 
     def do_POST(self):
-        # "Update website now". A JSON body means other websites can't trigger it without CORS.
-        if self.api() != '/api/publish':
+        # Requiring a JSON body means other websites can't post here without passing CORS,
+        # which this server never grants. (The game add-on posts through Tampermonkey.)
+        api = self.api()
+        if api not in ('/api/publish', '/api/inbox'):
             return self.send_error(404)
         if not self.from_this_pc():
             return
         if not (self.headers.get('Content-Type') or '').startswith('application/json'):
             return self.send_error(415)
-        publisher.schedule(delay=0)
-        self.send_json(200, publisher.status())
+        if api == '/api/publish':  # "Update website now"
+            publisher.schedule(delay=0)
+            return self.send_json(200, publisher.status())
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))))
+            with db_lock:
+                conn = connect()
+                try:
+                    added = add_to_inbox(conn, body.get('catches'))
+                    waiting = conn.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]
+                finally:
+                    conn.close()
+        except (ValueError, AttributeError, TypeError) as e:
+            return self.send_json(400, {'error': str(e)})
+        if added:
+            print(f'[{time.strftime("%H:%M")}] From the game: {added} fish')
+        self.send_json(200, {'ok': True, 'added': added, 'waiting': waiting})
 
     def log_message(self, fmt, *args):
         pass  # keep the console window quiet
