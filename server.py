@@ -27,7 +27,7 @@ DB_PATH = HERE / 'fishing-log.db'
 DATA_JSON = HERE / 'data.json'
 PUBLISH_DELAY = 10 * 60  # seconds after the last change before the website is updated
 WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-SETTINGS = ('version', 'categories', 'current', 'currentSince', 'lastBackup', 'seeds')
+SETTINGS = ('version', 'categories', 'current', 'currentSince', 'lastBackup', 'seeds', 'rare')
 
 db_lock = threading.Lock()
 
@@ -88,11 +88,13 @@ def save_state(conn, state):
                      json.dumps(readable, ensure_ascii=False), json.dumps(cond, ensure_ascii=False),
                      int(note), hm))
     with conn:  # one transaction: the file never holds half a save
+        # A page loaded before a setting existed (e.g. "rare") doesn't send it; keep the saved one.
+        kept = [(k, v) for k, v in conn.execute('SELECT key, value FROM settings') if k not in state]
         conn.execute('DELETE FROM catches')
         conn.executemany('INSERT INTO catches VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
         conn.execute('DELETE FROM settings')
         conn.executemany('INSERT INTO settings VALUES (?, ?)',
-                         [(k, json.dumps(state[k], ensure_ascii=False)) for k in SETTINGS if k in state])
+                         [(k, json.dumps(state[k], ensure_ascii=False)) for k in SETTINGS if k in state] + kept)
 
 
 # ---------- public website ----------
@@ -103,6 +105,7 @@ def public_data(state):
     return {
         'version': state.get('version'),
         'categories': state['categories'],
+        'rare': state.get('rare') or [],
         'catches': [{k: c[k] for k in keep if k in c} for c in state['catches']],
     }
 
@@ -134,8 +137,8 @@ def write_data_json():
         return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
 
     # One catch per line keeps the git history readable.
-    text = '{"version":%s,"updatedAt":%d,"categories":%s,"catches":[\n%s\n]}\n' % (
-        dump(data['version']), int(time.time() * 1000), dump(data['categories']),
+    text = '{"version":%s,"updatedAt":%d,"categories":%s,"rare":%s,"catches":[\n%s\n]}\n' % (
+        dump(data['version']), int(time.time() * 1000), dump(data['categories']), dump(data['rare']),
         ',\n'.join(dump(c) for c in data['catches']))
     DATA_JSON.write_text(text, encoding='utf-8')
     return len(data['catches'])

@@ -36,6 +36,7 @@
     --accent:#eaa53a; --accent-ink:#3b2413;
     --hit:#2b78b3; --zero:#e3c98f; --danger:#b23f2b;
     --field:#fffaf0;
+    --rare:#7a3cc4;
     --px2:0 -2px 0 var(--line),0 2px 0 var(--line),-2px 0 0 var(--line),2px 0 0 var(--line);
     --px3:0 -3px 0 var(--line),0 3px 0 var(--line),-3px 0 0 var(--line),3px 0 0 var(--line);
     --px4:0 -4px 0 var(--line),0 4px 0 var(--line),-4px 0 0 var(--line),4px 0 0 var(--line);
@@ -52,6 +53,7 @@
       --accent:#f2b552; --accent-ink:#2a1906;
       --hit:#5db5f0; --zero:#38456a; --danger:#e0654c;
       --field:#1b2338;
+      --rare:#c9a2ff;
       color-scheme:dark;
     }
   }
@@ -64,6 +66,7 @@
     --accent:#f2b552; --accent-ink:#2a1906;
     --hit:#5db5f0; --zero:#38456a; --danger:#e0654c;
     --field:#1b2338;
+    --rare:#c9a2ff;
     color-scheme:dark;
   }
   html,body{margin:0}
@@ -104,6 +107,8 @@
   .notice{grid-column:1/-1;background:var(--panel);color:var(--ink);padding:12px 16px 12px;margin:0 4px;
     box-shadow:var(--px3),inset 6px 0 0 var(--accent);padding-left:22px}
   .notice p{margin:4px 0 0}
+  .notice p+p:not(.en){font-size:15px}
+  .notice .clue{font-size:13px;padding:0 6px;margin:0 3px}
   .notice .en{font-size:14px;color:var(--muted)}
   .notice-tag{display:inline-block;font-size:13px;font-weight:700;letter-spacing:.5px;background:var(--accent);color:var(--accent-ink);padding:1px 8px}
   .facts{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin:0 0 14px}
@@ -221,6 +226,14 @@
   .tag.zero{opacity:.55}
   .tag.unknown{opacity:.4;background:transparent}
   .tag.cond{background:var(--panel-2);font-weight:600}
+  /* Rare fish: purple name everywhere, plus a gem on its Fish guide card. */
+  .rare,.chip.rare,.tag.rare,.link.rare{color:var(--rare)}
+  .gem{display:inline-block;line-height:0;vertical-align:middle}
+  .gem svg{display:block}
+  .gem-btn{background:none;border:0;padding:2px;cursor:pointer;line-height:0;align-self:center}
+  .gem-btn[aria-pressed="false"] svg{filter:grayscale(1);opacity:.35}
+  .gem-btn[aria-pressed="false"]:hover svg{opacity:.75}
+  .legend .gem{margin-right:4px}
   .clues{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding:2px}
   .clue{font-size:14px;background:var(--accent);color:var(--accent-ink);padding:1px 8px;box-shadow:var(--px2)}
   .clue.soft{background:var(--chip);color:var(--chip-ink)}
@@ -265,7 +278,9 @@
   <div class="notice" id="notice" hidden>
     <span class="notice-tag">หมายเหตุ · Note</span>
     <p>ข้อมูลทั้งหมดบันทึกจากการเล่นของผู้จัดทำเอง อาจไม่ครบถ้วนหรือไม่ถูกต้องทั้งหมด ใช้เป็นแนวทางประกอบการเล่นเท่านั้น</p>
-    <p class="en">Everything here was logged from my own play sessions, so it may be incomplete or wrong. Treat it as a guide.</p>
+    <p>ป้าย <span class="clue">… only</span> บนการ์ดปลา เช่น “น้ำลึก only” แปลว่าที่ผ่านมาเจอปลาตัวนั้นแค่ในเงื่อนไขนั้น อาจเป็นแค่เพราะยังเก็บข้อมูลได้ไม่มากพอ ไม่ได้แปลว่าเงื่อนไขอื่นจะตกไม่ได้</p>
+    <p class="en">Everything here was logged from my own play sessions, so it may be incomplete or wrong. Treat it as a guide.
+      An “… only” tag (e.g. “น้ำลึก only”) means that fish has only turned up with that condition so far. That may just be too little data, not proof it can't be caught any other way.</p>
   </div>
   <div class="banner" id="banner" hidden><b>Not saving to the database.</b> Catches you log here stay in this browser only. Double-click <b>start.bat</b> in the fishing folder and this page switches over by itself, bringing these catches along.</div>
   <div class="warn" id="warn" hidden>This browser isn't letting the page save, so your catches will be lost when you close it. Use Data → Export backup before closing.</div>
@@ -373,6 +388,7 @@ function defaults() {
     current: {location: 'ลำธารหมู่บ้าน', weather: 'ปลอดโปร่ง', water: 'น้ำลึก', lure: 'ไส้เดือน', spot: 'ไม่มี'},
     currentSince: Date.now(),
     catches: [],
+    rare: [], // fish names tagged as rare
     lastBackup: 0,
   };
 }
@@ -421,6 +437,7 @@ function addConditionForAll(d, catId, name, value, {after = null, options = []} 
 }
 function renameFish(d, from, to) {
   for (const c of d.catches) if (c.fish === from) c.fish = to;
+  if (d.rare?.includes(from)) d.rare = [...new Set(d.rare.map(n => (n === from ? to : n)))];
 }
 function renameOption(d, catId, from, to) {
   const cat = d.categories.find(c => c.id === catId);
@@ -450,6 +467,7 @@ function normalize(d) {
   d.current ||= {};
   d.currentSince ||= Date.now();
   d.lastBackup ||= 0;
+  d.rare = Array.isArray(d.rare) ? d.rare.filter(n => typeof n === 'string') : [];
   d.catches.sort((a, b) => a.t - b.t);
   migrate(d);
   return d;
@@ -604,7 +622,7 @@ async function loadPublished() {
     const data = await res.json();
     if (!Array.isArray(data.categories) || !Array.isArray(data.catches)) throw new Error('bad data');
     published = {updatedAt: data.updatedAt || 0};
-    S = normalize({version: data.version, categories: data.categories, catches: data.catches, current: {}, lastBackup: 0});
+    S = normalize({version: data.version, categories: data.categories, catches: data.catches, rare: data.rare, current: {}, lastBackup: 0});
     // The visitor's own picks (remembered in their browser); anything not in the data means "Any".
     for (const cat of S.categories) {
       const v = ui.pick?.[cat.id];
@@ -691,6 +709,19 @@ function valuesOf(cat) {
   }
   return [...cat.options, ...extra];
 }
+
+// Fish tagged as rare (on their Fish guide card) show their name in purple everywhere.
+const isRare = name => S.rare.includes(name);
+const rareCls = name => (isRare(name) ? ' rare' : '');
+const GEM = pixelSvg([
+  '.kkkkk.',
+  'klplpdk',
+  'kpppppk',
+  '.kpppk.',
+  '..kpk..',
+  '...k...',
+], {k: '#2a1a0e', l: '#f1e2ff', p: '#9b59f0', d: '#6b2fb8'}, 3);
+
 function fishCounts() {
   const m = new Map();
   for (const c of S.catches) m.set(c.fish, (m.get(c.fish) || 0) + 1);
@@ -759,6 +790,7 @@ function mergeIn(d) {
     have.add(id);
     added++;
   }
+  for (const n of Array.isArray(d.rare) ? d.rare : []) if (typeof n === 'string' && !S.rare.includes(n)) S.rare.push(n);
   S.catches.sort((a, b) => a.t - b.t);
   return added;
 }
@@ -973,11 +1005,11 @@ function renderCatchPanel() {
   const names = [...all.keys()].sort((a, b) => (here.get(b) || 0) - (here.get(a) || 0) || all.get(b) - all.get(a) || a.localeCompare(b));
   $('#fishList').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
   $('#quick').innerHTML = names.length
-    ? names.map(n => `<button class="chip${here.get(n) ? '' : ' ghost'}" type="button" data-act="quicklog" data-fish="${esc(n)}" title="Log ${esc(n)} now">${esc(n)}${here.get(n) ? `<small>${here.get(n)}</small>` : ''}</button>`).join('')
+    ? names.map(n => `<button class="chip${here.get(n) ? '' : ' ghost'}${rareCls(n)}" type="button" data-act="quicklog" data-fish="${esc(n)}" title="Log ${esc(n)} now">${esc(n)}${here.get(n) ? `<small>${here.get(n)}</small>` : ''}</button>`).join('')
     : '<span class="hint">Fish you log show up here as one-tap buttons.</span>';
   const recent = S.catches.slice(-5).reverse();
   $('#recent').innerHTML = recent.length
-    ? recent.map(c => `<li><span class="t">${timeText(c)}</span><b>${esc(c.fish)}</b><span class="cnd">${esc(condText(c.cond))}</span><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></li>`).join('')
+    ? recent.map(c => `<li><span class="t">${timeText(c)}</span><b class="${rareCls(c.fish)}">${esc(c.fish)}</b><span class="cnd">${esc(condText(c.cond))}</span><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></li>`).join('')
     : '<li class="hint">Nothing yet.</li>';
 }
 
@@ -1059,22 +1091,24 @@ function renderNow() {
   for (const {fish, hrs, n, unsure} of sorted) {
     const pct = Math.round(n / rows.length * 100);
     const unsureNote = unsure ? `<br><span class="hint" title="${unsure} of these catches didn't record every matched condition">${unsure === n ? 'all' : unsure} unsure</span>` : '';
-    h += `<tr><td><button class="link" type="button" data-act="openfish" data-fish="${esc(fish)}">${esc(fish)}</button></td><td class="num">${n}${unsureNote}</td>`
+    h += `<tr><td><button class="link${rareCls(fish)}" type="button" data-act="openfish" data-fish="${esc(fish)}">${esc(fish)}</button></td><td class="num">${n}${unsureNote}</td>`
       + `<td style="white-space:nowrap"><span class="bar"><span style="width:${pct}%"></span></span>${pct}%</td><td>${strip(hrs, hourTot, hour, 'hour', false)}</td></tr>`;
   }
   h += '</tbody></table></div>';
+  if (sorted.some(f => isRare(f.fish))) h += '<p class="hint"><span class="rare">Purple names</span> are rare fish.</p>';
 
   const all = fishCounts();
   const missing = [...all.keys()].filter(n => !byFish.has(n)).sort((a, b) => all.get(b) - all.get(a));
   if (missing.length) {
     h += `<h3 class="sub">${VIEW ? 'Not caught with these conditions yet' : 'Not caught with this match yet'}</h3><div class="chips">${missing.map(n =>
-      `<button class="chip ghost" type="button" data-act="openfish" data-fish="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+      `<button class="chip ghost${rareCls(n)}" type="button" data-act="openfish" data-fish="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
   }
   return h;
 }
 
 function fishShell() {
-  const sorts = [['count', 'Most caught'], ['rare', 'Rarest'], ['recent', 'Recently caught'], ['az', 'A–Z']];
+  // ('rare' is the saved key for "Least caught"; 'tagged' puts fish tagged as rare first.)
+  const sorts = [['count', 'Most caught'], ['rare', 'Least caught'], ['tagged', 'Rare fish first'], ['recent', 'Recently caught'], ['az', 'A–Z']];
   return `<div class="panel-head"><h2>Fish guide</h2></div>
     <p class="lead">Every fish ${VIEW ? 'caught so far' : 'you\'ve caught'}, and the conditions it turned up in.</p>
     <div class="controls">
@@ -1087,6 +1121,7 @@ function fishShell() {
       <span><span class="tag unknown">?</span> not tried yet</span>
       <span><span class="tag unknown">not noted</span> info missing</span>
       <span><span class="cell hit"></span>caught in that hour/day</span>
+      <span><span class="gem">${GEM}</span><span class="rare">purple name</span> = rare fish${VIEW ? '' : ' (click the gem on a card to tag one)'}</span>
     </div>
     <div id="fishCards" class="cards"></div>`;
 }
@@ -1127,6 +1162,7 @@ function fillFish() {
   const sorters = {
     count: (a, b) => b.n - a.n || a.name.localeCompare(b.name),
     rare: (a, b) => a.n - b.n || a.name.localeCompare(b.name),
+    tagged: (a, b) => isRare(b.name) - isRare(a.name) || b.n - a.n || a.name.localeCompare(b.name),
     recent: (a, b) => b.last - a.last,
     az: (a, b) => a.name.localeCompare(b.name),
   };
@@ -1135,7 +1171,11 @@ function fillFish() {
 
   const now = new Date();
   box.innerHTML = list.map(f => {
-    let h = `<article class="fish-card"><header><h3>${esc(f.name)}</h3><span class="count">×${f.n}</span>`
+    const rare = isRare(f.name);
+    const gem = VIEW
+      ? (rare ? `<span class="gem" title="Rare fish">${GEM}</span>` : '')
+      : `<button class="gem-btn" type="button" data-act="rare" data-fish="${esc(f.name)}" aria-pressed="${rare}" aria-label="Rare fish" title="${rare ? 'Tagged as rare. Click to untag' : 'Tag as a rare fish'}">${GEM}</button>`;
+    let h = `<article class="fish-card"><header><h3 class="${rareCls(f.name)}">${esc(f.name)}</h3>${gem}<span class="count">×${f.n}</span>`
       + (VIEW ? '' : `<button class="btn small ghost" type="button" data-act="renamefish" data-fish="${esc(f.name)}">Rename</button>`) + '</header>'
       + `<div class="last">${f.last ? `Last caught ${fmtWhen(f.last)}` : VIEW ? 'From early paper notes (no date)' : 'From your notes (no date)'}</div>`;
     const cl = clues(f, catTot);
@@ -1203,7 +1243,7 @@ function renderCombos() {
         : `<button class="btn small ghost" type="button" data-act="usecombo" data-key="${esc(g.key)}" title="Set these as your conditions">Use</button>`)
       + '</div><div class="chips tight">'
       + [...g.fish].sort((a, b) => b[1] - a[1]).map(([f, n]) =>
-        `<button class="tag seen" type="button" data-act="openfish" data-fish="${esc(f)}" title="${esc(`${n} of ${g.n} catches (${Math.round(n / g.n * 100)}%)`)}">${fishCombos.get(f).size === 1 ? '★ ' : ''}${esc(f)}<b>${n}</b></button>`).join('')
+        `<button class="tag seen${rareCls(f)}" type="button" data-act="openfish" data-fish="${esc(f)}" title="${esc(`${n} of ${g.n} catches (${Math.round(n / g.n * 100)}%)`)}">${fishCombos.get(f).size === 1 ? '★ ' : ''}${esc(f)}<b>${n}</b></button>`).join('')
       + '</div></div>';
   }
   return h + '</div>';
@@ -1227,7 +1267,7 @@ function fillLog() {
   const shown = ui.logAll ? rows : rows.slice(0, 200);
   let h = `<div class="table-wrap"><table><thead><tr><th>When</th><th>Fish</th>${S.categories.map(c => `<th>${esc(c.name)}</th>`).join('')}<th><span class="sr">Delete</span></th></tr></thead><tbody>`;
   for (const c of shown) {
-    h += `<tr><td class="when">${whenText(c)}</td><td><b>${esc(c.fish)}</b></td>${S.categories.map(cat => `<td>${esc(c.cond?.[cat.id] ?? '—')}</td>`).join('')}`
+    h += `<tr><td class="when">${whenText(c)}</td><td><b class="${rareCls(c.fish)}">${esc(c.fish)}</b></td>${S.categories.map(cat => `<td>${esc(c.cond?.[cat.id] ?? '—')}</td>`).join('')}`
       + `<td class="num"><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></td></tr>`;
   }
   h += '</tbody></table></div>';
@@ -1361,12 +1401,21 @@ document.addEventListener('click', async e => {
       ui.fishQ = fish; ui.tab = 'fish'; saveUi(); renderTabs(); renderView();
       $('#view').scrollIntoView({behavior: 'smooth', block: 'start'});
       break;
+    case 'rare': {
+      if (VIEW) break;
+      const tagged = !isRare(fish);
+      S.rare = tagged ? [...S.rare, fish] : S.rare.filter(n => n !== fish);
+      save(); renderAll();
+      toast(tagged ? `${fish} tagged as rare` : `${fish} is no longer tagged rare`);
+      break;
+    }
     case 'renamefish': {
       const v = await ask({title: `Rename “${fish}”`, text: 'Fixes the name on every catch. Type an existing fish name to merge the two.', value: fish, ok: 'Rename'});
       if (!v || v === fish) break;
       const other = [...fishCounts().keys()].find(n => n !== fish && n.toLowerCase() === v.toLowerCase());
       const target = other || v;
       for (const c of S.catches) if (c.fish === fish) c.fish = target;
+      if (S.rare.includes(fish)) S.rare = [...new Set(S.rare.map(n => (n === fish ? target : n)))];
       if (ui.fishQ === fish) ui.fishQ = target;
       save(); renderAll();
       toast(other ? `Merged into ${target}` : `Renamed to ${target}`);
