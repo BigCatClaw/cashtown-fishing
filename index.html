@@ -131,6 +131,7 @@
   .center{text-align:center}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   .mini-label{font-size:13px;color:var(--muted);margin:16px 0 8px;text-transform:uppercase;letter-spacing:1px}
+  .mini-label.first{margin-top:0}
 
   .chips{display:flex;flex-wrap:wrap;gap:8px;padding:2px}
   .chips.tight{gap:6px}
@@ -168,7 +169,7 @@
 
   .catch-form{display:flex;gap:14px;padding:3px}
   .catch-form .field{flex:1 1 0;width:0}
-  .recent{list-style:none;margin:0;padding:0;font-size:15px}
+  .recent{list-style:none;margin:0 0 16px;padding:0;font-size:15px}
   .recent li{display:flex;gap:8px;align-items:baseline;padding:3px 0}
   .recent .t{color:var(--muted);font-variant-numeric:tabular-nums}
   .recent .cnd{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
@@ -302,6 +303,8 @@
 
     <section class="panel" id="catchPanel" aria-labelledby="catchTitle">
       <div class="panel-head"><h2 id="catchTitle">Caught something?</h2></div>
+      <div class="mini-label first">Recent</div>
+      <ul class="recent" id="recent"></ul>
       <form id="catchForm" class="catch-form" autocomplete="off">
         <input class="field" id="fishInput" list="fishList" placeholder="Fish name, then Enter" aria-label="Fish name" autofocus>
         <button class="btn" type="submit">Log it</button>
@@ -309,8 +312,6 @@
       <datalist id="fishList"></datalist>
       <div class="mini-label">Tap to log</div>
       <div class="chips" id="quick"></div>
-      <div class="mini-label">Recent</div>
-      <ul class="recent" id="recent"></ul>
     </section>
   </aside>
 
@@ -1052,7 +1053,7 @@ function renderCatchPanel() {
   $('#quick').innerHTML = names.length
     ? names.map(n => `<button class="chip${here.get(n) ? '' : ' ghost'}${rareCls(n)}" type="button" data-act="quicklog" data-fish="${esc(n)}" title="Log ${esc(n)} now">${esc(n)}${here.get(n) ? `<small>${here.get(n)}</small>` : ''}</button>`).join('')
     : '<span class="hint">Fish you log show up here as one-tap buttons.</span>';
-  const recent = S.catches.slice(-5).reverse();
+  const recent = S.catches.slice(-6).reverse(); // two casts of three
   $('#recent').innerHTML = recent.length
     ? recent.map(c => `<li><span class="t">${timeText(c)}</span><b class="${rareCls(c.fish)}">${esc(c.fish)}</b>${sizeText(c)}<span class="cnd">${esc(condText(c.cond))}</span><button class="x" type="button" data-act="del" data-id="${esc(c.id)}" aria-label="Delete this catch" title="Delete">×</button></li>`).join('')
     : '<li class="hint">Nothing yet.</li>';
