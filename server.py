@@ -31,7 +31,7 @@ DB_PATH = HERE / 'fishing-log.db'
 DATA_JSON = HERE / 'data.json'
 PUBLISH_DELAY = 10 * 60  # seconds after the last change before the website is updated
 WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-SETTINGS = ('version', 'categories', 'current', 'currentSince', 'lastBackup', 'seeds', 'rare')
+SETTINGS = ('version', 'categories', 'current', 'currentSince', 'lastBackup', 'seeds', 'rare', 'superRare')
 
 db_lock = threading.Lock()
 
@@ -165,6 +165,7 @@ def public_data(state):
         'version': state.get('version'),
         'categories': state['categories'],
         'rare': state.get('rare') or [],
+        'superRare': state.get('superRare') or [],
         'catches': [{k: c[k] for k in keep if k in c} for c in state['catches']],
     }
 
@@ -196,9 +197,9 @@ def write_data_json():
         return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
 
     # One catch per line keeps the git history readable.
-    text = '{"version":%s,"updatedAt":%d,"categories":%s,"rare":%s,"catches":[\n%s\n]}\n' % (
+    text = '{"version":%s,"updatedAt":%d,"categories":%s,"rare":%s,"superRare":%s,"catches":[\n%s\n]}\n' % (
         dump(data['version']), int(time.time() * 1000), dump(data['categories']), dump(data['rare']),
-        ',\n'.join(dump(c) for c in data['catches']))
+        dump(data['superRare']), ',\n'.join(dump(c) for c in data['catches']))
     DATA_JSON.write_text(text, encoding='utf-8')
     return len(data['catches'])
 

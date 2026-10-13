@@ -37,6 +37,7 @@
     --hit:#2b78b3; --zero:#e3c98f; --danger:#b23f2b;
     --field:#fffaf0;
     --rare:#7a3cc4;
+    --super-glow:rgba(155,89,240,.5); /* white would vanish on cream */
     --px2:0 -2px 0 var(--line),0 2px 0 var(--line),-2px 0 0 var(--line),2px 0 0 var(--line);
     --px3:0 -3px 0 var(--line),0 3px 0 var(--line),-3px 0 0 var(--line),3px 0 0 var(--line);
     --px4:0 -4px 0 var(--line),0 4px 0 var(--line),-4px 0 0 var(--line),4px 0 0 var(--line);
@@ -54,6 +55,7 @@
       --hit:#5db5f0; --zero:#38456a; --danger:#e0654c;
       --field:#1b2338;
       --rare:#c9a2ff;
+      --super-glow:rgba(255,255,255,.5);
       color-scheme:dark;
     }
   }
@@ -67,6 +69,7 @@
     --hit:#5db5f0; --zero:#38456a; --danger:#e0654c;
     --field:#1b2338;
     --rare:#c9a2ff;
+    --super-glow:rgba(255,255,255,.5);
     color-scheme:dark;
   }
   html,body{margin:0}
@@ -229,12 +232,19 @@
   .tag.cond{background:var(--panel-2);font-weight:600}
   /* Rare fish: purple name everywhere, plus a gem on its Fish guide card. */
   .rare,.chip.rare,.tag.rare,.link.rare{color:var(--rare)}
-  .gem{display:inline-block;line-height:0;vertical-align:middle}
-  .gem svg{display:block}
+  /* Super rare: same purple, bolder, glowing; a twinkling diamond instead of the gem. */
+  .rare.super{font-weight:700;text-shadow:0 0 6px var(--super-glow),0 0 12px var(--super-glow)}
+  .gem,.diamond{display:inline-block;line-height:0;vertical-align:middle}
+  .gem svg,.diamond svg{display:block}
+  .diamond svg,.gem-btn.super svg{filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px rgba(255,255,255,.8))}
+  @media (prefers-reduced-motion:no-preference){
+    .diamond svg,.gem-btn.super svg{animation:twinkle 2.4s ease-in-out infinite}
+  }
+  @keyframes twinkle{50%{filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 10px rgba(255,255,255,.95))}}
   .gem-btn{background:none;border:0;padding:2px;cursor:pointer;line-height:0;align-self:center}
-  .gem-btn[aria-pressed="false"] svg{filter:grayscale(1);opacity:.35}
-  .gem-btn[aria-pressed="false"]:hover svg{opacity:.75}
-  .legend .gem{margin-right:4px}
+  .gem-btn[data-level="0"] svg{filter:grayscale(1);opacity:.35}
+  .gem-btn[data-level="0"]:hover svg{opacity:.75}
+  .legend .gem,.legend .diamond{margin-right:4px}
   .clues{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding:2px}
   .clue{font-size:14px;background:var(--accent);color:var(--accent-ink);padding:1px 8px;box-shadow:var(--px2)}
   .clue.soft{background:var(--chip);color:var(--chip-ink)}
@@ -389,7 +399,8 @@ function defaults() {
     current: {location: 'ลำธารหมู่บ้าน', weather: 'ปลอดโปร่ง', water: 'น้ำลึก', lure: 'ไส้เดือน', spot: 'ไม่มี'},
     currentSince: Date.now(),
     catches: [],
-    rare: [], // fish names tagged as rare
+    rare: [],      // fish names tagged as rare
+    superRare: [], // ... and as super rare (a fish is in at most one of the two)
     lastBackup: 0,
   };
 }
@@ -438,7 +449,9 @@ function addConditionForAll(d, catId, name, value, {after = null, options = []} 
 }
 function renameFish(d, from, to) {
   for (const c of d.catches) if (c.fish === from) c.fish = to;
-  if (d.rare?.includes(from)) d.rare = [...new Set(d.rare.map(n => (n === from ? to : n)))];
+  for (const key of ['rare', 'superRare']) {
+    if (d[key]?.includes(from)) d[key] = [...new Set(d[key].map(n => (n === from ? to : n)))];
+  }
 }
 function renameOption(d, catId, from, to) {
   const cat = d.categories.find(c => c.id === catId);
@@ -468,7 +481,8 @@ function normalize(d) {
   d.current ||= {};
   d.currentSince ||= Date.now();
   d.lastBackup ||= 0;
-  d.rare = Array.isArray(d.rare) ? d.rare.filter(n => typeof n === 'string') : [];
+  d.superRare = Array.isArray(d.superRare) ? d.superRare.filter(n => typeof n === 'string') : [];
+  d.rare = Array.isArray(d.rare) ? d.rare.filter(n => typeof n === 'string' && !d.superRare.includes(n)) : [];
   d.catches.sort((a, b) => a.t - b.t);
   migrate(d);
   return d;
@@ -707,7 +721,7 @@ async function loadPublished() {
     const data = await res.json();
     if (!Array.isArray(data.categories) || !Array.isArray(data.catches)) throw new Error('bad data');
     published = {updatedAt: data.updatedAt || 0};
-    S = normalize({version: data.version, categories: data.categories, catches: data.catches, rare: data.rare, current: {}, lastBackup: 0});
+    S = normalize({version: data.version, categories: data.categories, catches: data.catches, rare: data.rare, superRare: data.superRare, current: {}, lastBackup: 0});
     // The visitor's own picks (remembered in their browser); anything not in the data means "Any".
     for (const cat of S.categories) {
       const v = ui.pick?.[cat.id];
@@ -795,9 +809,21 @@ function valuesOf(cat) {
   return [...cat.options, ...extra];
 }
 
-// Fish tagged as rare (on their Fish guide card) show their name in purple everywhere.
-const isRare = name => S.rare.includes(name);
-const rareCls = name => (isRare(name) ? ' rare' : '');
+// Fish tagged on their Fish guide card: rare (purple name, gem) or super rare (glowing purple
+// name, diamond). The name looks that way everywhere it appears.
+const rarity = name => (S.superRare.includes(name) ? 2 : S.rare.includes(name) ? 1 : 0);
+const isRare = name => rarity(name) > 0;
+const rareCls = name => ['', ' rare', ' rare super'][rarity(name)];
+const DIAMOND = pixelSvg([
+  '..kkkkk..',
+  '.kwwbwwk.',
+  'kwwbwbwwk',
+  'kbbbbbbbk',
+  '.kbwbwbk.',
+  '..kbwbk..',
+  '...kbk...',
+  '....k....',
+], {k: '#1d2a3a', w: '#ffffff', b: '#a8e6ff'}, 3);
 const GEM = pixelSvg([
   '.kkkkk.',
   'klplpdk',
@@ -876,7 +902,12 @@ function mergeIn(d) {
     have.add(id);
     added++;
   }
-  for (const n of Array.isArray(d.rare) ? d.rare : []) if (typeof n === 'string' && !S.rare.includes(n)) S.rare.push(n);
+  for (const n of Array.isArray(d.superRare) ? d.superRare : []) {
+    if (typeof n === 'string' && !S.superRare.includes(n)) { S.superRare.push(n); S.rare = S.rare.filter(r => r !== n); }
+  }
+  for (const n of Array.isArray(d.rare) ? d.rare : []) {
+    if (typeof n === 'string' && !S.rare.includes(n) && !S.superRare.includes(n)) S.rare.push(n);
+  }
   S.catches.sort((a, b) => a.t - b.t);
   return added;
 }
@@ -1182,7 +1213,10 @@ function renderNow() {
       + `<td style="white-space:nowrap"><span class="bar"><span style="width:${pct}%"></span></span>${pct}%</td><td>${strip(hrs, hourTot, hour, 'hour', false)}</td></tr>`;
   }
   h += '</tbody></table></div>';
-  if (sorted.some(f => isRare(f.fish))) h += '<p class="hint"><span class="rare">Purple names</span> are rare fish.</p>';
+  const tiers = new Set(sorted.map(f => rarity(f.fish)));
+  if (tiers.has(1) && tiers.has(2)) h += '<p class="hint"><span class="rare">Purple names</span> are rare fish; <span class="rare super">glowing ones</span> are super rare.</p>';
+  else if (tiers.has(1)) h += '<p class="hint"><span class="rare">Purple names</span> are rare fish.</p>';
+  else if (tiers.has(2)) h += '<p class="hint"><span class="rare super">Glowing purple names</span> are super rare fish.</p>';
 
   const all = fishCounts();
   const missing = [...all.keys()].filter(n => !byFish.has(n)).sort((a, b) => all.get(b) - all.get(a));
@@ -1208,7 +1242,8 @@ function fishShell() {
       <span><span class="tag unknown">?</span> not tried yet</span>
       <span><span class="tag unknown">not noted</span> info missing</span>
       <span><span class="cell hit"></span>caught in that hour/day</span>
-      <span><span class="gem">${GEM}</span><span class="rare">purple name</span> = rare fish${VIEW ? '' : ' (click the gem on a card to tag one)'}</span>
+      <span><span class="gem">${GEM}</span><span class="rare">purple name</span> = rare fish</span>
+      <span><span class="diamond">${DIAMOND}</span><span class="rare super">glowing name</span> = super rare${VIEW ? '' : ' (click the gem on a card: rare → super rare → off)'}</span>
     </div>
     <div id="fishCards" class="cards"></div>`;
 }
@@ -1250,7 +1285,7 @@ function fillFish() {
   const sorters = {
     count: (a, b) => b.n - a.n || a.name.localeCompare(b.name),
     rare: (a, b) => a.n - b.n || a.name.localeCompare(b.name),
-    tagged: (a, b) => isRare(b.name) - isRare(a.name) || b.n - a.n || a.name.localeCompare(b.name),
+    tagged: (a, b) => rarity(b.name) - rarity(a.name) || b.n - a.n || a.name.localeCompare(b.name),
     recent: (a, b) => b.last - a.last,
     az: (a, b) => a.name.localeCompare(b.name),
   };
@@ -1259,10 +1294,12 @@ function fillFish() {
 
   const now = new Date();
   box.innerHTML = list.map(f => {
-    const rare = isRare(f.name);
+    const level = rarity(f.name), icon = level === 2 ? DIAMOND : GEM;
     const gem = VIEW
-      ? (rare ? `<span class="gem" title="Rare fish">${GEM}</span>` : '')
-      : `<button class="gem-btn" type="button" data-act="rare" data-fish="${esc(f.name)}" aria-pressed="${rare}" aria-label="Rare fish" title="${rare ? 'Tagged as rare. Click to untag' : 'Tag as a rare fish'}">${GEM}</button>`;
+      ? ['', `<span class="gem" title="Rare fish">${GEM}</span>`, `<span class="diamond" title="Super rare fish">${DIAMOND}</span>`][level]
+      : `<button class="gem-btn${level === 2 ? ' super' : ''}" type="button" data-act="rare" data-fish="${esc(f.name)}" data-level="${level}"`
+        + ` aria-label="Rarity: ${['not tagged', 'rare', 'super rare'][level]}"`
+        + ` title="${['Tag as rare (click again for super rare)', 'Rare. Click for super rare', 'Super rare. Click to untag'][level]}">${icon}</button>`;
     let h = `<article class="fish-card"><header><h3 class="${rareCls(f.name)}">${esc(f.name)}</h3>${gem}<span class="count">×${f.n}</span>`
       + (VIEW ? '' : `<button class="btn small ghost" type="button" data-act="renamefish" data-fish="${esc(f.name)}">Rename</button>`) + '</header>'
       + `<div class="last">${f.last ? `Last caught ${fmtWhen(f.last)}` : VIEW ? 'From early paper notes (no date)' : 'From your notes (no date)'}`
@@ -1490,12 +1527,15 @@ document.addEventListener('click', async e => {
       ui.fishQ = fish; ui.tab = 'fish'; saveUi(); renderTabs(); renderView();
       $('#view').scrollIntoView({behavior: 'smooth', block: 'start'});
       break;
-    case 'rare': {
+    case 'rare': { // cycles: not tagged → rare → super rare → not tagged
       if (VIEW) break;
-      const tagged = !isRare(fish);
-      S.rare = tagged ? [...S.rare, fish] : S.rare.filter(n => n !== fish);
+      const next = (rarity(fish) + 1) % 3;
+      S.rare = S.rare.filter(n => n !== fish);
+      S.superRare = S.superRare.filter(n => n !== fish);
+      if (next === 1) S.rare.push(fish);
+      if (next === 2) S.superRare.push(fish);
       save(); renderAll();
-      toast(tagged ? `${fish} tagged as rare` : `${fish} is no longer tagged rare`);
+      toast([`${fish} is no longer tagged`, `${fish} tagged as rare`, `${fish} tagged as super rare`][next]);
       break;
     }
     case 'renamefish': {
@@ -1504,7 +1544,9 @@ document.addEventListener('click', async e => {
       const other = [...fishCounts().keys()].find(n => n !== fish && n.toLowerCase() === v.toLowerCase());
       const target = other || v;
       for (const c of S.catches) if (c.fish === fish) c.fish = target;
-      if (S.rare.includes(fish)) S.rare = [...new Set(S.rare.map(n => (n === fish ? target : n)))];
+      for (const key of ['rare', 'superRare']) {
+        if (S[key].includes(fish)) S[key] = [...new Set(S[key].map(n => (n === fish ? target : n)))];
+      }
       if (ui.fishQ === fish) ui.fishQ = target;
       save(); renderAll();
       toast(other ? `Merged into ${target}` : `Renamed to ${target}`);
