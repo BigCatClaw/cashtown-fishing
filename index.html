@@ -516,9 +516,7 @@ async function connectDb() {
       }
     }
   } catch {
-    db = 'offline';
-    renderDb();
-    retryTimer = setTimeout(connectDb, 10000);
+    goOffline();
     return;
   }
   db = 'ok';
@@ -530,26 +528,63 @@ async function connectDb() {
   pullInbox();
 }
 
+// Saves carry the database version (S.rev) this page last had. The server refuses a save
+// from an older version, so a tab left open can never write its stale copy over newer data.
 async function push() {
   if (pushing) { pushAgain = true; return; }
   pushing = true;
   const gen = dirtyGen;
+  let stale = false;
   try {
     const res = await fetch(API, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(S)});
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    savedGen = gen;
-    dbSavedAt = Date.now();
-    if (gen === dirtyGen) setPending(false);
-    const body = await res.json().catch(() => ({}));
-    if (body.publish) { pub = body.publish; checkPubWhenDue(); }
+    if (res.status === 409) {
+      stale = true;
+    } else {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      savedGen = gen;
+      dbSavedAt = Date.now();
+      if (gen === dirtyGen) setPending(false);
+      const body = await res.json().catch(() => ({}));
+      if (Number.isInteger(body.rev)) S.rev = body.rev;
+      if (body.publish) { pub = body.publish; checkPubWhenDue(); }
+    }
   } catch {
-    db = 'offline';
-    clearTimeout(retryTimer);
-    retryTimer = setTimeout(connectDb, 10000);
+    goOffline();
   }
   pushing = false;
+  if (stale) return resync();
   renderDb();
   if (pushAgain) { pushAgain = false; if (db === 'ok') push(); }
+}
+
+// The database changed since this page loaded it (another tab saved, or fishing-log.db was
+// edited directly). Take the database's version, keep catches logged here that it doesn't
+// have yet, and save again.
+async function resync() {
+  try {
+    const res = await fetch(API, {cache: 'no-store'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const saved = await res.json();
+    if (!saved || !Array.isArray(saved.catches) || !Array.isArray(saved.categories)) throw new Error('no log');
+    const local = S;
+    S = normalize(saved);
+    mergeIn(local);
+    S.current = local.current;
+    S.currentSince = local.currentSince;
+  } catch {
+    goOffline();
+    return;
+  }
+  pushAgain = false;
+  save();
+  renderAll();
+}
+
+function goOffline() {
+  db = 'offline';
+  renderDb();
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(connectDb, 10000); // reconnecting reloads the database's version first
 }
 
 function renderDb() {
@@ -591,7 +626,13 @@ async function pullInbox() {
   if (!API || db !== 'ok' || pullingInbox) return;
   pullingInbox = true;
   try {
-    const res = await fetch('api/inbox', {cache: 'no-store'});
+    let res;
+    try {
+      res = await fetch('api/inbox', {cache: 'no-store'});
+    } catch {
+      goOffline(); // start.bat was closed: notice now, not at the next save
+      return;
+    }
     if (!res.ok) return;
     const have = new Set(S.catches.map(c => c.id));
     const items = (await res.json()).filter(it => it && it.id && typeof it.fish === 'string' && !have.has(it.id));

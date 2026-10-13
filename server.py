@@ -103,15 +103,23 @@ def save_state(conn, state):
                      json.dumps(readable, ensure_ascii=False), json.dumps(cond, ensure_ascii=False),
                      int(note), hm, size))
     with conn:  # one transaction: the file never holds half a save
+        rev = get_rev(conn) + 1  # every save is a new version of the log
         # A page loaded before a setting existed (e.g. "rare") doesn't send it; keep the saved one.
-        kept = [(k, v) for k, v in conn.execute('SELECT key, value FROM settings') if k not in state]
+        kept = [(k, v) for k, v in conn.execute('SELECT key, value FROM settings') if k not in state and k != 'rev']
         conn.execute('DELETE FROM catches')
         conn.executemany('INSERT INTO catches (id, t, caught_at, weekday, hour, fish, conditions, cond, '
                          'from_notes, note_time, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', rows)
         conn.execute('DELETE FROM settings')
         conn.executemany('INSERT INTO settings VALUES (?, ?)',
-                         [(k, json.dumps(state[k], ensure_ascii=False)) for k in SETTINGS if k in state] + kept)
+                         [(k, json.dumps(state[k], ensure_ascii=False)) for k in SETTINGS if k in state] + kept
+                         + [('rev', json.dumps(rev))])
         conn.execute('DELETE FROM inbox WHERE id IN (SELECT id FROM catches)')  # picked up by the page
+    return rev
+
+
+def get_rev(conn):
+    row = conn.execute("SELECT value FROM settings WHERE key = 'rev'").fetchone()
+    return json.loads(row[0]) if row else 0
 
 
 # ---------- catches from the game (cashtown-autolog.user.js) ----------
@@ -352,14 +360,20 @@ class Handler(SimpleHTTPRequestHandler):
             with db_lock:
                 conn = connect()
                 try:
-                    save_state(conn, state)
+                    # A page holding an older version than the database (another tab saved, or
+                    # fishing-log.db was edited directly) must reload before it can save.
+                    base, current = state.get('rev') if isinstance(state, dict) else None, get_rev(conn)
+                    stale = isinstance(base, int) and not isinstance(base, bool) and base != current
+                    rev = None if stale else save_state(conn, state)
                 finally:
                     conn.close()
-        except (ValueError, KeyError, TypeError) as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             return self.send_json(400, {'error': str(e)})
+        if stale:
+            return self.send_json(409, {'error': 'the log changed since this page loaded it', 'rev': current})
         if publisher.enabled and public_data(state) != read_data_json():
             publisher.schedule()  # restarts the 10-minute wait
-        self.send_json(200, {'ok': True, 'catches': len(state['catches']), 'publish': publisher.status()})
+        self.send_json(200, {'ok': True, 'rev': rev, 'catches': len(state['catches']), 'publish': publisher.status()})
 
     def do_POST(self):
         # Requiring a JSON body means other websites can't post here without passing CORS,
